@@ -162,21 +162,27 @@ function App() {
           </div>
         </div>
 
-        {/* TABLA DE HISTORIAL (Añadida) */}
+       {/* TABLA DE HISTORIAL (Añadida) */}
         <div style={{ ...cardStyle, marginBottom: '30px' }}>
           <h3 style={{ color: '#065f46', marginTop: 0 }}>📋 Últimos Registros en la Nube</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
             <thead>
-              <tr style={{ borderBottom: '2px solid #10b981' }}>
-                <th>Fecha</th><th>Luz (kWh)</th><th>Agua (m³)</th><th>Residuos (kg)</th>
+              <tr style={{ borderBottom: '2px solid #10b981', color: '#374151' }}>
+                <th style={{ padding: '10px' }}>Fecha</th>
+                <th>Luz (kWh)</th>
+                <th>Agua (m³)</th>
+                <th>Residuos (kg)</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody style={{ color: '#1f2937' }}> {/* <-- ESTO ES LO IMPORTANTE: Letra oscura */}
               {registros.map((r, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{padding:'10px'}}>{new Date(r.fecha_registro).toLocaleDateString()}</td>
-                  <td>{r.luz}</td><td>{r.agua}</td>
-                  <td>{Number(r.organicos) + Number(r.inorganicos) + Number(r.otros)}</td>
+                  <td style={{ padding: '12px', color: '#1f2937' }}>{new Date(r.fecha_registro).toLocaleDateString()}</td>
+                  <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.luz}</td>
+                  <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.agua}</td>
+                  <td style={{ fontWeight: 'bold', color: '#1f2937' }}>
+                    {Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0)}
+                  </td>
                 </tr>
               ))}
             </tbody>
