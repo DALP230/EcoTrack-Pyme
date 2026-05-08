@@ -61,7 +61,7 @@ function App() {
     border: '1px solid #d1fae5'
   };
 
-  // --- VISTA 1: LOGIN ---
+ // --- VISTA 1: LOGIN (DISEÑO ORIGINAL CON LÓGICA REAL) ---
   if (!isLoggedIn) {
     return (
       <div style={{ height: '100vh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'linear-gradient(135deg, #064e3b 0%, #16a34a 100%)' }}>
@@ -76,17 +76,44 @@ function App() {
               onChange={(e) => setFormData({...formData, correo: e.target.value})} />
             <input type="password" placeholder="Contraseña" style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
               onChange={(e) => setFormData({...formData, password: e.target.value})} />
-            <button onClick={() => {
-              if (formData.correo && formData.password) {
-                setIsLoggedIn(true); 
-                setUserData({nombre: formData.nombre || 'David'});
-              } else { alert("Llena los campos"); }
+            
+            <button onClick={async () => {
+              // --- ESTA ES LA ÚNICA PARTE QUE CAMBIA (LÓGICA) ---
+              if (!formData.correo || !formData.password) return alert("Llena los campos");
+
+              const url = isRegistering ? 'registro' : 'login';
+              
+              try {
+                const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/${url}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(formData)
+                });
+                
+                const data = await res.json();
+
+                if (res.ok) {
+                  if (isRegistering) {
+                    alert("✅ Registro exitoso. ¡Inicia sesión!");
+                    setIsRegistering(false);
+                  } else {
+                    // Si es Login exitoso
+                    setIsLoggedIn(true); 
+                    setUserData({nombre: data.nombre || 'Usuario'});
+                  }
+                } else {
+                  alert(data.message || "Error en el acceso");
+                }
+              } catch (error) {
+                alert("Error de conexión con el servidor");
+              }
+              // --- FIN DE LA LÓGICA ---
             }} type="button" style={{ padding: '12px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
               {isRegistering ? 'REGISTRARME' : 'ENTRAR'}
             </button>
           </form>
           <button onClick={() => setIsRegistering(!isRegistering)} style={{ marginTop: '20px', background: 'none', border: 'none', color: '#059669', cursor: 'pointer', textDecoration: 'underline' }}>
-            {isRegistering ? 'Cambiar a ' + (isRegistering ? 'Login' : 'Registro') : '¿No tienes cuenta? Regístrate aquí'}
+            {isRegistering ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate aquí'}
           </button>
         </div>
       </div>
