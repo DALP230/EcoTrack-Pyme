@@ -152,7 +152,33 @@ function App() {
               <label style={{display:'block', marginBottom:'5px', fontWeight:'bold', color: '#064e3b'}}>♻️ Otros (kg)</label>
               <input type="number" value={residuos.otros} onChange={(e) => setResiduos({...residuos, otros: e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'2px solid #065f46', boxSizing:'border-box'}} />
             </div>
-            <button onClick={() => alert("Reporte Guardado")} style={{ padding: '12px 25px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', cursor:'pointer', fontWeight:'bold', height:'42px' }}>GUARDAR</button>
+            <button onClick={async () => {const datosConsumo = {luz: Number(luz.actual), agua: Number(agua.actual), organicos: Number(residuos.organicos), inorganicos: Number(residuos.inorganicos), otros: Number(residuos.otros)};
+    try {
+      const response = await fetch('https://ecotrack-server-v1.onrender.com/api/registros', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(datosConsumo)
+      });
+
+      const resultado = await response.json();
+
+      if (response.ok) {
+        alert("✅ Datos guardados en la nube (Neon)");
+        if (resultado.alerta) {
+          alert("⚠️ ATENCIÓN: " + resultado.alerta);
+        }
+      } else {
+        alert("❌ Error al guardar");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("❌ No se pudo conectar con el servidor de Render");
+    }
+  }} 
+  style={{ padding: '12px 25px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', cursor:'pointer', fontWeight:'bold', height:'42px' }}
+>
+  GUARDAR
+</button>
           </div>
         </div>
 
