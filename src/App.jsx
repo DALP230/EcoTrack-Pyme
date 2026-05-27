@@ -88,8 +88,8 @@ function App() {
         tableRows.push(["Sin datos", "0", "0", "0"]);
       }
 
-      // Dibujar la tabla en el PDF
-      doc.autoTable({
+      // Dibujar la tabla en el PDF (¡CORREGIDO AQUÍ!)
+      autoTable(doc, {
         head: [tableColumn],
         body: tableRows,
         startY: 50,
