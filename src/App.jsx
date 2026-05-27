@@ -3,8 +3,8 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   LineChart, Line, CartesianGrid, Legend, PieChart, Pie, Cell 
 } from 'recharts';
-import { jsPDF } from 'jspdf'; // IMPORTACIÓN CORREGIDA CON LLAVES
-import 'jspdf-autotable';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const logoUrl = '/logo-ecotrack.png'; 
 
