@@ -51,6 +51,7 @@ function App() {
   const handleLogout = () => {
     setIsLoggedIn(false);
     setHasCompany(false);
+    setUserRol('user');
   };
 
   const cardStyle = { 
@@ -98,14 +99,23 @@ function App() {
                     alert("✅ Registro exitoso. ¡Inicia sesión!");
                     setIsRegistering(false);
                   } else {
-                    // Si es Login exitoso
-                     setUserRol(data.rol || 'user');
+                    // --- DETECCIÓN DIRECTA DE ADMINISTRADORES REALES ---
+                    const correoIngresado = formData.correo.trim().toLowerCase();
+                    
+                    if (
+                      correoIngresado === 'lopezperezdavidantonio@gmail.com' || 
+                      correoIngresado === '230i0030@martineztorre.tecnm.mx' ||
+                      correoIngresado === 'solecitocortes75@gmail.com'
+                    ) {
+                      setUserRol('admin');
+                    } else {
+                      setUserRol('user');
+                    }
+                    
                     setIsLoggedIn(true); 
-                    setUserData({nombre: data.nombre || 'Usuario'});
+                    setUserData({ nombre: data.nombre || 'Usuario' });
                   }
-                  
                 } else {
-                 
                   alert(data.message || "Error en el acceso");
                 }
               } catch (error) {
@@ -130,6 +140,12 @@ function App() {
       <div style={{ height: '100vh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#ecfdf5' }}>
         <div style={{ ...cardStyle, width: '450px', textAlign: 'center' }}>
           <h2 style={{ color: '#065f46' }}>Bienvenido, {userData.nombre}</h2>
+          
+          {/* Renglón agregado: No altera tu diseño, usa color rojo para admin y azul para usuario */}
+          <div style={{ marginBottom: '15px', fontWeight: 'bold', color: userRol === 'admin' ? '#ef4444' : '#3b82f6', fontSize: '14px' }}>
+            Nivel de Acceso: {userRol.toUpperCase()}
+          </div>
+
           <button onClick={() => {
               setCompanyData({ nombreComercial: 'EcoTrack Principal' });
               setHasCompany(true);
