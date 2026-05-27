@@ -7,24 +7,19 @@ import {
 const logoUrl = '/logo-ecotrack.png'; 
 
 function App() {
-  // --- ESTADOS DE CONTROL ---
   const [isLoggedIn, setIsLoggedIn] = useState(false); 
   const [isRegistering, setIsRegistering] = useState(false);
   const [hasCompany, setHasCompany] = useState(false);
-  
-  // --- ESTADOS DE DATOS ---
   const [userRol, setUserRol] = useState('user');
   const [userData, setUserData] = useState({ nombre: '' });
   const [companyData, setCompanyData] = useState({ nombreComercial: '', rfc: '', ciudad: '' });
   const [formData, setFormData] = useState({ nombre: '', correo: '', password: '' });
   const [registros, setRegistros] = useState([]);
 
-  // --- ESTADOS DE INPUTS (CONSUMO) ---
   const [luz, setLuz] = useState({ actual: 0, anterior: 0 });
   const [agua, setAgua] = useState({ actual: 0, anterior: 0 });
   const [residuos, setResiduos] = useState({ organicos: 0, inorganicos: 0, otros: 0 });
 
-  // --- FUNCIÓN PARA CARGAR HISTORIAL ---
   const cargarDatos = async () => {
     try {
       const res = await fetch('https://ecotrack-server-v1.onrender.com/api/registros');
@@ -62,7 +57,7 @@ function App() {
     border: '1px solid #d1fae5'
   };
 
- // --- VISTA 1: LOGIN ---
+  // --- VISTA 1: LOGIN ---
   if (!isLoggedIn) {
     return (
       <div style={{ height: '100vh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'linear-gradient(135deg, #064e3b 0%, #16a34a 100%)' }}>
@@ -99,7 +94,6 @@ function App() {
                   } else {
                     const correoIngresado = formData.correo.trim().toLowerCase();
                     
-                    // Validación de administrador real
                     if (
                       correoIngresado === 'lopezperezdavidantonio8@gmail.com' || 
                       correoIngresado === '230i0030@martineztorre.tecnm.mx' ||
@@ -137,11 +131,9 @@ function App() {
       <div style={{ height: '100vh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#ecfdf5' }}>
         <div style={{ ...cardStyle, width: '450px', textAlign: 'center' }}>
           <h2 style={{ color: '#065f46' }}>Bienvenido, {userData.nombre}</h2>
-          
           <div style={{ marginBottom: '15px', fontWeight: 'bold', color: userRol === 'admin' ? '#ef4444' : '#3b82f6', fontSize: '14px' }}>
             Nivel de Acceso Asignado: {userRol.toUpperCase()}
           </div>
-
           <button onClick={() => {
               setCompanyData({ nombreComercial: 'EcoTrack Principal' });
               setHasCompany(true);
@@ -154,12 +146,15 @@ function App() {
   }
 
   // --- VISTA 3: DASHBOARD ---
-  const pieData = [
-    { name: 'Orgánicos', value: Number(residuos.organicos) || 0 },
-    { name: 'Inorgánicos', value: Number(residuos.inorganicos) || 0 },
-    { name: 'Otros', value: Number(residuos.otros) || 0 },
-  ].filter(d => d.value > 0);
+  // Tomamos el último registro que llegó de la base de datos en Neon para la gráfica
+  const ultimoRegistro = registros.length > 0 ? registros[0] : { organicos: 0, inorganicos: 0, otros: 0 };
 
+  const pieData = [
+    { name: 'Orgánicos', value: Number(ultimoRegistro.organicos) || 0 },
+    { name: 'Inorgánicos', value: Number(ultimoRegistro.inorganicos) || 0 },
+    { name: 'Otros', value: Number(ultimoRegistro.otros) || 0 },
+  ].filter(d => d.value > 0);
+  
   const COLORS = ['#4ade80', '#10b981', '#064e3b'];
 
   return (
@@ -184,7 +179,6 @@ function App() {
           <p style={{ color: '#4b5563', margin: 0 }}>Gestiona y visualiza tu impacto ambiental en tiempo real.</p>
         </div>
 
-        {/* FORMULARIO DE REGISTRO */}
         <div style={{ ...cardStyle, marginBottom: '30px' }}>
           <h3 style={{marginTop:0, color:'#374151'}}>Nuevo Registro de Consumo</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr) auto', gap: '15px', alignItems: 'flex-end' }}>
@@ -200,14 +194,13 @@ function App() {
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(payload)
                 });
-                if (res.ok) { alert("✅ Guardado en Neon"); cargarDatos(); }
+                if (res.ok) { alert("✅ Guardado en Neon (PostgreSQL)"); cargarDatos(); }
               }} style={{ padding: '12px 25px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', cursor:'pointer', fontWeight:'bold' }}>GUARDAR</button>
           </div>
         </div>
 
-        {/* TABLA DE HISTORIAL */}
         <div style={{ ...cardStyle, marginBottom: '30px' }}>
-          <h3 style={{ color: '#065f46', marginTop: 0 }}>📋 Últimos Registros en la Nube</h3>
+          <h3 style={{ color: '#065f46', marginTop: 0 }}>📋 Últimos Registros en la Nube (PostgreSQL)</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #10b981', color: '#374151' }}>
@@ -229,8 +222,50 @@ function App() {
                   </td>
                   {userRol === 'admin' && (
                     <td>
-                      <button onClick={() => alert("Función Editar")} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', marginRight: '5px', cursor: 'pointer' }}>Editar</button>
-                      <button onClick={() => alert("Función Eliminar")} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Eliminar</button>
+                      {/* --- BOTÓN EDITAR EN TIEMPO REAL --- */}
+                      <button onClick={async () => {
+                        const nuevaLuz = prompt("Nuevo valor de LUZ (kWh):", r.luz);
+                        if (nuevaLuz === null) return;
+                        const nuevaAgua = prompt("Nuevo valor de AGUA (m³):", r.agua);
+                        if (nuevaAgua === null) return;
+
+                        const idRegistro = r.id || r.id_registro; // Soporta ambos nombres de columna
+                        try {
+                          const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/registros/${idRegistro}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ luz: Number(nuevaLuz), agua: Number(nuevaAgua) })
+                          });
+                          if (res.ok) {
+                            alert("✅ Actualizado en Neon (PostgreSQL)");
+                            cargarDatos();
+                          } else {
+                            alert("Error al actualizar (Verifica que Render se haya actualizado)");
+                          }
+                        } catch (e) {
+                          alert("Error de red");
+                        }
+                      }} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', marginRight: '5px', cursor: 'pointer' }}>Editar</button>
+                      
+                      {/* --- BOTÓN ELIMINAR EN TIEMPO REAL --- */}
+                      <button onClick={async () => {
+                        if(window.confirm("⚠️ ¿Estás completamente seguro de ELIMINAR este registro de PostgreSQL?")) {
+                          const idRegistro = r.id || r.id_registro;
+                          try {
+                            const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/registros/${idRegistro}`, {
+                              method: 'DELETE'
+                            });
+                            if (res.ok) {
+                              alert("🗑️ Eliminado de Neon (PostgreSQL)");
+                              cargarDatos();
+                            } else {
+                              alert("Error al eliminar (Verifica que Render se haya actualizado)");
+                            }
+                          } catch (e) {
+                            alert("Error de red");
+                          }
+                        }
+                      }} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Eliminar</button>
                     </td>
                   )}
                 </tr>
@@ -239,39 +274,10 @@ function App() {
           </table>
         </div>
 
-        {/* GRÁFICAS */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '25px' }}>
-          <div style={{...cardStyle, height:'400px'}}>
-            <h3 style={{ color: '#b45309' }}>⚡ Luz (Histórico)</h3>
-            <ResponsiveContainer width="100%" height="85%">
-              <BarChart data={registros.slice().reverse()}>
-                <XAxis dataKey="fecha_registro" tickFormatter={(v) => new Date(v).toLocaleDateString()} />
-                <YAxis /><Tooltip /><Bar dataKey="luz" fill="#fbbf24" radius={[10, 10, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div style={{...cardStyle, height:'400px'}}>
-            <h3 style={{ color: '#0369a1' }}>💧 Agua (Histórico)</h3>
-            <ResponsiveContainer width="100%" height="85%">
-              <LineChart data={registros.slice().reverse()}>
-                <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="fecha_registro" tickFormatter={(v) => new Date(v).toLocaleDateString()} />
-                <YAxis /><Tooltip /><Line type="monotone" dataKey="agua" stroke="#0ea5e9" strokeWidth={4} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div style={{...cardStyle, height:'400px'}}>
-            <h3 style={{ color: '#15803d' }}>♻️ Residuos Actuales</h3>
-            <ResponsiveContainer width="100%" height="85%">
-              <PieChart>
-                <Pie data={pieData.length ? pieData : [{name:'Vacío', value:1}]} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value">
-                  {pieData.map((e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                </Pie>
-                <Tooltip /><Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          <div style={{...cardStyle, height:'400px'}}><h3 style={{ color: '#b45309' }}>⚡ Luz (Histórico)</h3><ResponsiveContainer width="100%" height="85%"><BarChart data={registros.slice().reverse()}><XAxis dataKey="fecha_registro" tickFormatter={(v) => new Date(v).toLocaleDateString()} /><YAxis /><Tooltip /><Bar dataKey="luz" fill="#fbbf24" radius={[10, 10, 0, 0]} /></BarChart></ResponsiveContainer></div>
+          <div style={{...cardStyle, height:'400px'}}><h3 style={{ color: '#0369a1' }}>💧 Agua (Histórico)</h3><ResponsiveContainer width="100%" height="85%"><LineChart data={registros.slice().reverse()}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="fecha_registro" tickFormatter={(v) => new Date(v).toLocaleDateString()} /><YAxis /><Tooltip /><Line type="monotone" dataKey="agua" stroke="#0ea5e9" strokeWidth={4} /></LineChart></ResponsiveContainer></div>
+          <div style={{...cardStyle, height:'400px'}}><h3 style={{ color: '#15803d' }}>♻️ Residuos</h3><ResponsiveContainer width="100%" height="85%"><PieChart><Pie data={pieData.length ? pieData : [{name:'Vacío', value:1}]} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value">{pieData.map((e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer></div>
         </div>
       </main>
     </div>
