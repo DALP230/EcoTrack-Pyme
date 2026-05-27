@@ -17,7 +17,7 @@ function App() {
   const [userData, setUserData] = useState({ nombre: '' });
   const [companyData, setCompanyData] = useState({ nombreComercial: '', rfc: '', ciudad: '' });
   const [formData, setFormData] = useState({ nombre: '', correo: '', password: '' });
-  const [registros, setRegistros] = useState([]); // Historial de la BD
+  const [registros, setRegistros] = useState([]);
 
   // --- ESTADOS DE INPUTS (CONSUMO) ---
   const [luz, setLuz] = useState({ actual: 0, anterior: 0 });
@@ -31,7 +31,6 @@ function App() {
       const data = await res.json();
       if (Array.isArray(data)) {
         setRegistros(data);
-        // Actualizar el valor "anterior" con el último registro de la BD
         if (data.length > 0) {
           setLuz(prev => ({ ...prev, anterior: data[0].luz }));
           setAgua(prev => ({ ...prev, anterior: data[0].agua }));
@@ -100,8 +99,9 @@ function App() {
                   } else {
                     const correoIngresado = formData.correo.trim().toLowerCase();
                     
+                    // Validación de administrador real
                     if (
-                      correoIngresado === 'lopezperezdavidantonio@gmail.com' || 
+                      correoIngresado === 'lopezperezdavidantonio8@gmail.com' || 
                       correoIngresado === '230i0030@martineztorre.tecnm.mx' ||
                       correoIngresado === 'solecitocortes75@gmail.com'
                     ) {
@@ -182,22 +182,6 @@ function App() {
         <div style={{ ...cardStyle, marginBottom: '30px', borderLeft: '6px solid #10b981' }}>
           <h2 style={{ color: '#065f46', marginTop: 0 }}>📊 Panel de Sostenibilidad</h2>
           <p style={{ color: '#4b5563', margin: 0 }}>Gestiona y visualiza tu impacto ambiental en tiempo real.</p>
-          
-          {/* --- PANEL DE COMPROBACIÓN (SIMULADOR DE ROLES) --- */}
-          <div style={{ marginTop: '20px', display: 'flex', gap: '10px', alignItems: 'center', padding: '10px', backgroundColor: '#f3f4f6', borderRadius: '8px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#374151' }}>⚙️ Simulador para la Evaluación:</span>
-            <button 
-              onClick={() => setUserRol('user')} 
-              style={{ padding: '8px 15px', background: userRol === 'user' ? '#3b82f6' : '#d1d5db', color: userRol === 'user' ? '#fff' : '#374151', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>
-              👤 Ver como Usuario Normal
-            </button>
-            <button 
-              onClick={() => setUserRol('admin')} 
-              style={{ padding: '8px 15px', background: userRol === 'admin' ? '#ef4444' : '#d1d5db', color: userRol === 'admin' ? '#fff' : '#374151', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>
-              🔑 Ver como Administrador
-            </button>
-          </div>
-
         </div>
 
         {/* FORMULARIO DE REGISTRO */}
