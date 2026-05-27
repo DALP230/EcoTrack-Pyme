@@ -29,8 +29,8 @@ function App() {
       if (Array.isArray(data)) {
         setRegistros(data);
         if (data.length > 0) {
-          setLuz(prev => ({ ...prev, anterior: data[0].luz }));
-          setAgua(prev => ({ ...prev, anterior: data[0].agua }));
+          setLuz(prev => ({ ...prev, anterior: data[0].luz || 0 }));
+          setAgua(prev => ({ ...prev, anterior: data[0].agua || 0 }));
         }
       }
     } catch (error) {
@@ -48,6 +48,13 @@ function App() {
     setIsLoggedIn(false);
     setHasCompany(false);
     setUserRol('user');
+  };
+
+  // --- FUNCIÓN DE CONTROL DE FECHAS SEGURA ---
+  const formatearFecha = (fechaRaw) => {
+    if (!fechaRaw) return new Date().toLocaleDateString();
+    const d = new Date(fechaRaw);
+    return isNaN(d.getTime()) ? new Date().toLocaleDateString() : d.toLocaleDateString();
   };
 
   // --- FUNCIÓN PARA GENERAR EL PDF CORREGIDA Y PROTEGIDA ---
@@ -75,9 +82,8 @@ function App() {
       if (registros && registros.length > 0) {
         registros.forEach(r => {
           const totalResiduos = Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0);
-          const fecha = r.fecha_registro ? new Date(r.fecha_registro).toLocaleDateString() : new Date().toLocaleDateString();
           const rowData = [
-            fecha,
+            formatearFecha(r.fecha_registro),
             r.luz || 0,
             r.agua || 0,
             totalResiduos
@@ -88,15 +94,23 @@ function App() {
         tableRows.push(["Sin datos", "0", "0", "0"]);
       }
 
-      // Dibujar la tabla en el PDF (¡CORREGIDO AQUÍ!)
-      autoTable(doc, {
+      // Sistema híbrido de renderizado autoTable anti-fallos de compilador (Vite/Webpack)
+      const opcionesTabla = {
         head: [tableColumn],
         body: tableRows,
         startY: 50,
         styles: { fontSize: 10, cellPadding: 3 },
-        headStyles: { fillColor: [16, 185, 129] }, // Color verde del header
-        alternateRowStyles: { fillColor: [243, 244, 246] } // Color gris para filas alternas
-      });
+        headStyles: { fillColor: [16, 185, 129] },
+        alternateRowStyles: { fillColor: [243, 244, 246] }
+      };
+
+      if (typeof autoTable === 'function') {
+        autoTable(doc, opcionesTabla);
+      } else if (typeof doc.autoTable === 'function') {
+        doc.autoTable(opcionesTabla);
+      } else {
+        throw new Error("No se pudo vincular el generador de tablas jsPDF.");
+      }
 
       // Guardar el documento
       doc.save("Reporte_EcoTrack.pdf");
@@ -206,13 +220,15 @@ function App() {
   // --- VISTA 3: DASHBOARD ---
   const ultimoRegistro = registros[0] || {};
 
-  const pieData = [
+  const pieDataRaw = [
     { name: 'Orgánicos', value: Number(ultimoRegistro.organicos) || 0 },
     { name: 'Inorgánicos', value: Number(ultimoRegistro.inorganicos) || 0 },
     { name: 'Otros', value: Number(ultimoRegistro.otros) || 0 },
   ].filter(d => d.value > 0);
-  
-  const COLORS = ['#4ade80', '#10b981', '#064e3b'];
+
+  // Solución definitiva al error de renderizado del PieChart vacío
+  const datosGraficoPastel = pieDataRaw.length > 0 ? pieDataRaw : [{ name: 'Sin datos', value: 1 }];
+  const coloresPastel = pieDataRaw.length > 0 ? ['#4ade80', '#10b981', '#064e3b'] : ['#cbd5e1'];
 
   return (
     <div style={{ width: '100vw', minHeight: '100vh', backgroundColor: '#ecfdf5', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif' }}>
@@ -231,7 +247,6 @@ function App() {
       </header>
 
       <main style={{ padding: '40px' }}>
-        {/* EL BOTÓN AHORA ES VISIBLE PARA TODOS (RESPETANDO LOS PERMISOS) */}
         <div style={{ ...cardStyle, marginBottom: '30px', borderLeft: '6px solid #10b981', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h2 style={{ color: '#065f46', marginTop: 0 }}>📊 Panel de Sostenibilidad</h2>
@@ -277,7 +292,7 @@ function App() {
             <tbody style={{ color: '#1f2937' }}>
               {registros.map((r, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '12px', color: '#1f2937' }}>{new Date(r.fecha_registro).toLocaleDateString()}</td>
+                  <td style={{ padding: '12px', color: '#1f2937' }}>{formatearFecha(r.fecha_registro)}</td>
                   <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.luz}</td>
                   <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.agua}</td>
                   <td style={{ fontWeight: 'bold', color: '#1f2937' }}>
@@ -319,7 +334,7 @@ function App() {
                             alert("✅ Actualizado en Neon (PostgreSQL)");
                             cargarDatos();
                           } else {
-                            alert("Error al actualizar (Verifica que Render se haya actualizado)");
+                            alert("Error al actualizar");
                           }
                         } catch (e) {
                           alert("Error de red");
@@ -337,7 +352,7 @@ function App() {
                               alert("🗑️ Eliminado de Neon (PostgreSQL)");
                               cargarDatos();
                             } else {
-                              alert("Error al eliminar (Verifica que Render se haya actualizado)");
+                              alert("Error al eliminar");
                             }
                           } catch (e) {
                             alert("Error de red");
@@ -353,9 +368,52 @@ function App() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '25px' }}>
-          <div style={{...cardStyle, height:'400px'}}><h3 style={{ color: '#b45309' }}>⚡ Luz (Histórico)</h3><ResponsiveContainer width="100%" height="85%"><BarChart data={registros.slice().reverse()}><XAxis dataKey="fecha_registro" tickFormatter={(v) => new Date(v).toLocaleDateString()} /><YAxis /><Tooltip /><Bar dataKey="luz" fill="#fbbf24" radius={[10, 10, 0, 0]} /></BarChart></ResponsiveContainer></div>
-          <div style={{...cardStyle, height:'400px'}}><h3 style={{ color: '#0369a1' }}>💧 Agua (Histórico)</h3><ResponsiveContainer width="100%" height="85%"><LineChart data={registros.slice().reverse()}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="fecha_registro" tickFormatter={(v) => new Date(v).toLocaleDateString()} /><YAxis /><Tooltip /><Line type="monotone" dataKey="agua" stroke="#0ea5e9" strokeWidth={4} /></LineChart></ResponsiveContainer></div>
-          <div style={{...cardStyle, height:'400px'}}><h3 style={{ color: '#15803d' }}>♻️ Residuos</h3><ResponsiveContainer width="100%" height="85%"><PieChart><Pie data={pieData.length ? pieData : [{name:'Vacío', value:1}]} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value">{pieData.map((e, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Pie><Tooltip /><Legend /></PieChart></ResponsiveContainer></div>
+          <div style={{...cardStyle, height:'400px'}}>
+            <h3 style={{ color: '#b45309' }}>⚡ Luz (Histórico)</h3>
+            <ResponsiveContainer width="100%" height="85%">
+              <BarChart data={registros.slice().reverse()}>
+                <XAxis dataKey="fecha_registro" tickFormatter={(v) => formatearFecha(v)} />
+                <YAxis />
+                <Tooltip labelFormatter={(v) => formatearFecha(v)} />
+                <Bar dataKey="luz" fill="#fbbf24" radius={[10, 10, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          
+          <div style={{...cardStyle, height:'400px'}}>
+            <h3 style={{ color: '#0369a1' }}>💧 Agua (Histórico)</h3>
+            <ResponsiveContainer width="100%" height="85%">
+              <LineChart data={registros.slice().reverse()}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="fecha_registro" tickFormatter={(v) => formatearFecha(v)} />
+                <YAxis />
+                <Tooltip labelFormatter={(v) => formatearFecha(v)} />
+                <Line type="monotone" dataKey="agua" stroke="#0ea5e9" strokeWidth={4} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          
+          <div style={{...cardStyle, height:'400px'}}>
+            <h3 style={{ color: '#15803d' }}>♻️ Residuos</h3>
+            <ResponsiveContainer width="100%" height="85%">
+              <PieChart>
+                <Pie 
+                  data={datosGraficoPastel} 
+                  cx="50%" 
+                  cy="50%" 
+                  innerRadius={60} 
+                  outerRadius={90} 
+                  dataKey="value"
+                >
+                  {datosGraficoPastel.map((e, i) => (
+                    <Cell key={i} fill={coloresPastel[i % coloresPastel.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </main>
     </div>
