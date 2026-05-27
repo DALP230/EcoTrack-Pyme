@@ -63,7 +63,7 @@ function App() {
     border: '1px solid #d1fae5'
   };
 
- // --- VISTA 1: LOGIN (DISEÑO ORIGINAL CON LÓGICA REAL) ---
+ // --- VISTA 1: LOGIN ---
   if (!isLoggedIn) {
     return (
       <div style={{ height: '100vh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'linear-gradient(135deg, #064e3b 0%, #16a34a 100%)' }}>
@@ -80,7 +80,6 @@ function App() {
               onChange={(e) => setFormData({...formData, password: e.target.value})} />
             
             <button onClick={async () => {
-              // --- ESTA ES LA ÚNICA PARTE QUE CAMBIA (LÓGICA) ---
               if (!formData.correo || !formData.password) return alert("Llena los campos");
 
               const url = isRegistering ? 'registro' : 'login';
@@ -99,7 +98,6 @@ function App() {
                     alert("✅ Registro exitoso. ¡Inicia sesión!");
                     setIsRegistering(false);
                   } else {
-                    // --- DETECCIÓN DIRECTA DE ADMINISTRADORES REALES ---
                     const correoIngresado = formData.correo.trim().toLowerCase();
                     
                     if (
@@ -121,7 +119,6 @@ function App() {
               } catch (error) {
                 alert("Error de conexión con el servidor");
               }
-              // --- FIN DE LA LÓGICA ---
             }} type="button" style={{ padding: '12px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
               {isRegistering ? 'REGISTRARME' : 'ENTRAR'}
             </button>
@@ -141,9 +138,8 @@ function App() {
         <div style={{ ...cardStyle, width: '450px', textAlign: 'center' }}>
           <h2 style={{ color: '#065f46' }}>Bienvenido, {userData.nombre}</h2>
           
-          {/* Renglón agregado: No altera tu diseño, usa color rojo para admin y azul para usuario */}
           <div style={{ marginBottom: '15px', fontWeight: 'bold', color: userRol === 'admin' ? '#ef4444' : '#3b82f6', fontSize: '14px' }}>
-            Nivel de Acceso: {userRol.toUpperCase()}
+            Nivel de Acceso Asignado: {userRol.toUpperCase()}
           </div>
 
           <button onClick={() => {
@@ -157,7 +153,7 @@ function App() {
     );
   }
 
-  // --- VISTA 3: DASHBOARD (LO QUE HABÍAS DISEÑADO) ---
+  // --- VISTA 3: DASHBOARD ---
   const pieData = [
     { name: 'Orgánicos', value: Number(residuos.organicos) || 0 },
     { name: 'Inorgánicos', value: Number(residuos.inorganicos) || 0 },
@@ -186,6 +182,22 @@ function App() {
         <div style={{ ...cardStyle, marginBottom: '30px', borderLeft: '6px solid #10b981' }}>
           <h2 style={{ color: '#065f46', marginTop: 0 }}>📊 Panel de Sostenibilidad</h2>
           <p style={{ color: '#4b5563', margin: 0 }}>Gestiona y visualiza tu impacto ambiental en tiempo real.</p>
+          
+          {/* --- PANEL DE COMPROBACIÓN (SIMULADOR DE ROLES) --- */}
+          <div style={{ marginTop: '20px', display: 'flex', gap: '10px', alignItems: 'center', padding: '10px', backgroundColor: '#f3f4f6', borderRadius: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#374151' }}>⚙️ Simulador para la Evaluación:</span>
+            <button 
+              onClick={() => setUserRol('user')} 
+              style={{ padding: '8px 15px', background: userRol === 'user' ? '#3b82f6' : '#d1d5db', color: userRol === 'user' ? '#fff' : '#374151', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>
+              👤 Ver como Usuario Normal
+            </button>
+            <button 
+              onClick={() => setUserRol('admin')} 
+              style={{ padding: '8px 15px', background: userRol === 'admin' ? '#ef4444' : '#d1d5db', color: userRol === 'admin' ? '#fff' : '#374151', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>
+              🔑 Ver como Administrador
+            </button>
+          </div>
+
         </div>
 
         {/* FORMULARIO DE REGISTRO */}
@@ -209,43 +221,41 @@ function App() {
           </div>
         </div>
 
-       {/* TABLA DE HISTORIAL (Modificada con Control de Accesos) */}
-<div style={{ ...cardStyle, marginBottom: '30px' }}>
-  <h3 style={{ color: '#065f46', marginTop: 0 }}>📋 Últimos Registros en la Nube</h3>
-  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
-    <thead>
-      <tr style={{ borderBottom: '2px solid #10b981', color: '#374151' }}>
-        <th style={{ padding: '10px' }}>Fecha</th>
-        <th>Luz (kWh)</th>
-        <th>Agua (m³)</th>
-        <th>Residuos (kg)</th>
-        {/* Si es admin, ve el encabezado de acciones */}
-        {userRol === 'admin' && <th>Acciones</th>}
-      </tr>
-    </thead>
-    <tbody style={{ color: '#1f2937' }}>
-      {registros.map((r, i) => (
-        <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
-          <td style={{ padding: '12px', color: '#1f2937' }}>{new Date(r.fecha_registro).toLocaleDateString()}</td>
-          <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.luz}</td>
-          <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.agua}</td>
-          <td style={{ fontWeight: 'bold', color: '#1f2937' }}>
-            {Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0)}
-          </td>
-          {/* Si es admin, ve los botones de Editar y Eliminar */}
-          {userRol === 'admin' && (
-            <td>
-              <button onClick={() => alert("Editar registro")} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', marginRight: '5px', cursor: 'pointer' }}>Editar</button>
-              <button onClick={() => alert("Eliminar registro")} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Eliminar</button>
-            </td>
-          )}
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</div>
+        {/* TABLA DE HISTORIAL */}
+        <div style={{ ...cardStyle, marginBottom: '30px' }}>
+          <h3 style={{ color: '#065f46', marginTop: 0 }}>📋 Últimos Registros en la Nube</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #10b981', color: '#374151' }}>
+                <th style={{ padding: '10px' }}>Fecha</th>
+                <th>Luz (kWh)</th>
+                <th>Agua (m³)</th>
+                <th>Residuos (kg)</th>
+                {userRol === 'admin' && <th>Acciones CRUD</th>}
+              </tr>
+            </thead>
+            <tbody style={{ color: '#1f2937' }}>
+              {registros.map((r, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: '12px', color: '#1f2937' }}>{new Date(r.fecha_registro).toLocaleDateString()}</td>
+                  <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.luz}</td>
+                  <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.agua}</td>
+                  <td style={{ fontWeight: 'bold', color: '#1f2937' }}>
+                    {Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0)}
+                  </td>
+                  {userRol === 'admin' && (
+                    <td>
+                      <button onClick={() => alert("Función Editar")} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', marginRight: '5px', cursor: 'pointer' }}>Editar</button>
+                      <button onClick={() => alert("Función Eliminar")} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Eliminar</button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-        {/* GRÁFICAS RECUERADAS */}
+        {/* GRÁFICAS */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '25px' }}>
           <div style={{...cardStyle, height:'400px'}}>
             <h3 style={{ color: '#b45309' }}>⚡ Luz (Histórico)</h3>
