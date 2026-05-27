@@ -3,6 +3,8 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   LineChart, Line, CartesianGrid, Legend, PieChart, Pie, Cell 
 } from 'recharts';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const logoUrl = '/logo-ecotrack.png'; 
 
@@ -46,6 +48,51 @@ function App() {
     setIsLoggedIn(false);
     setHasCompany(false);
     setUserRol('user');
+  };
+
+  // --- FUNCIÓN PARA GENERAR EL PDF PROFESIONAL ---
+  const generarReportePDF = () => {
+    const doc = new jsPDF();
+    
+    // Título principal
+    doc.setFontSize(20);
+    doc.setTextColor(6, 95, 70); // Verde EcoTrack
+    doc.text("Reporte de Sostenibilidad - EcoTrack", 14, 22);
+    
+    // Información del reporte y usuario
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Empresa: ${companyData.nombreComercial || 'EcoTrack Principal'}`, 14, 32);
+    doc.text(`Generado por: ${userData.nombre} (Rol: ${userRol.toUpperCase()})`, 14, 38);
+    doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`, 14, 44);
+
+    // Preparar los datos para la tabla
+    const tableColumn = ["Fecha", "Luz (kWh)", "Agua (m³)", "Residuos Totales (kg)"];
+    const tableRows = [];
+
+    registros.forEach(r => {
+      const totalResiduos = Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0);
+      const rowData = [
+        new Date(r.fecha_registro).toLocaleDateString(),
+        r.luz,
+        r.agua,
+        totalResiduos
+      ];
+      tableRows.push(rowData);
+    });
+
+    // Dibujar la tabla en el PDF
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 50, // Empieza debajo del texto
+      styles: { fontSize: 10, cellPadding: 3 },
+      headStyles: { fillColor: [16, 185, 129] }, // Color verde del header
+      alternateRowStyles: { fillColor: [243, 244, 246] } // Color gris para filas alternas
+    });
+
+    // Guardar el documento
+    doc.save("Reporte_EcoTrack.pdf");
   };
 
   const cardStyle = { 
@@ -146,7 +193,6 @@ function App() {
   }
 
   // --- VISTA 3: DASHBOARD ---
-  // Protegemos la variable por si el dato tarda en llegar o viene vacío
   const ultimoRegistro = registros[0] || {};
 
   const pieData = [
@@ -174,9 +220,15 @@ function App() {
       </header>
 
       <main style={{ padding: '40px' }}>
-        <div style={{ ...cardStyle, marginBottom: '30px', borderLeft: '6px solid #10b981' }}>
-          <h2 style={{ color: '#065f46', marginTop: 0 }}>📊 Panel de Sostenibilidad</h2>
-          <p style={{ color: '#4b5563', margin: 0 }}>Gestiona y visualiza tu impacto ambiental en tiempo real.</p>
+        <div style={{ ...cardStyle, marginBottom: '30px', borderLeft: '6px solid #10b981', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ color: '#065f46', marginTop: 0 }}>📊 Panel de Sostenibilidad</h2>
+            <p style={{ color: '#4b5563', margin: 0 }}>Gestiona y visualiza tu impacto ambiental en tiempo real.</p>
+          </div>
+          {/* BOTÓN OFICIAL DE PDF */}
+          <button onClick={generarReportePDF} style={{ padding: '12px 20px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+            🖨️ Descargar Reporte PDF
+          </button>
         </div>
 
         <div style={{ ...cardStyle, marginBottom: '30px' }}>
@@ -222,7 +274,6 @@ function App() {
                   </td>
                   {userRol === 'admin' && (
                     <td>
-                      {/* --- BOTÓN EDITAR EN TIEMPO REAL --- */}
                       <button onClick={async () => {
                         const nuevaLuz = prompt("Nuevo valor de LUZ (kWh):", r.luz);
                         if (nuevaLuz === null) return;
@@ -239,7 +290,7 @@ function App() {
                         const nuevosOtros = prompt("Nuevo valor de OTROS (kg):", r.otros || 0);
                         if (nuevosOtros === null) return;
 
-                        const idRegistro = r.id || r.id_registro; // Soporta ambos nombres de columna
+                        const idRegistro = r.id || r.id_registro; 
                         try {
                           const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/registros/${idRegistro}`, {
                             method: 'PUT',
@@ -264,7 +315,6 @@ function App() {
                         }
                       }} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', marginRight: '5px', cursor: 'pointer' }}>Editar</button>
                       
-                      {/* --- BOTÓN ELIMINAR EN TIEMPO REAL --- */}
                       <button onClick={async () => {
                         if(window.confirm("⚠️ ¿Estás completamente seguro de ELIMINAR este registro de PostgreSQL?")) {
                           const idRegistro = r.id || r.id_registro;
