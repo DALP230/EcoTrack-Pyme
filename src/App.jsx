@@ -13,6 +13,7 @@ function App() {
   const [hasCompany, setHasCompany] = useState(false);
   
   // --- ESTADOS DE DATOS ---
+  const [userRol, setUserRol] = useState('user');
   const [userData, setUserData] = useState({ nombre: '' });
   const [companyData, setCompanyData] = useState({ nombreComercial: '', rfc: '', ciudad: '' });
   const [formData, setFormData] = useState({ nombre: '', correo: '', password: '' });
@@ -98,10 +99,13 @@ function App() {
                     setIsRegistering(false);
                   } else {
                     // Si es Login exitoso
+                     setUserRol(data.rol || 'user');
                     setIsLoggedIn(true); 
                     setUserData({nombre: data.nombre || 'Usuario'});
                   }
+                  
                 } else {
+                 
                   alert(data.message || "Error en el acceso");
                 }
               } catch (error) {
@@ -189,32 +193,41 @@ function App() {
           </div>
         </div>
 
-       {/* TABLA DE HISTORIAL (Añadida) */}
-        <div style={{ ...cardStyle, marginBottom: '30px' }}>
-          <h3 style={{ color: '#065f46', marginTop: 0 }}>📋 Últimos Registros en la Nube</h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #10b981', color: '#374151' }}>
-                <th style={{ padding: '10px' }}>Fecha</th>
-                <th>Luz (kWh)</th>
-                <th>Agua (m³)</th>
-                <th>Residuos (kg)</th>
-              </tr>
-            </thead>
-            <tbody style={{ color: '#1f2937' }}> {/* <-- ESTO ES LO IMPORTANTE: Letra oscura */}
-              {registros.map((r, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '12px', color: '#1f2937' }}>{new Date(r.fecha_registro).toLocaleDateString()}</td>
-                  <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.luz}</td>
-                  <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.agua}</td>
-                  <td style={{ fontWeight: 'bold', color: '#1f2937' }}>
-                    {Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+       {/* TABLA DE HISTORIAL (Modificada con Control de Accesos) */}
+<div style={{ ...cardStyle, marginBottom: '30px' }}>
+  <h3 style={{ color: '#065f46', marginTop: 0 }}>📋 Últimos Registros en la Nube</h3>
+  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
+    <thead>
+      <tr style={{ borderBottom: '2px solid #10b981', color: '#374151' }}>
+        <th style={{ padding: '10px' }}>Fecha</th>
+        <th>Luz (kWh)</th>
+        <th>Agua (m³)</th>
+        <th>Residuos (kg)</th>
+        {/* Si es admin, ve el encabezado de acciones */}
+        {userRol === 'admin' && <th>Acciones</th>}
+      </tr>
+    </thead>
+    <tbody style={{ color: '#1f2937' }}>
+      {registros.map((r, i) => (
+        <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+          <td style={{ padding: '12px', color: '#1f2937' }}>{new Date(r.fecha_registro).toLocaleDateString()}</td>
+          <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.luz}</td>
+          <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.agua}</td>
+          <td style={{ fontWeight: 'bold', color: '#1f2937' }}>
+            {Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0)}
+          </td>
+          {/* Si es admin, ve los botones de Editar y Eliminar */}
+          {userRol === 'admin' && (
+            <td>
+              <button onClick={() => alert("Editar registro")} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', marginRight: '5px', cursor: 'pointer' }}>Editar</button>
+              <button onClick={() => alert("Eliminar registro")} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Eliminar</button>
+            </td>
+          )}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
 
         {/* GRÁFICAS RECUERADAS */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '25px' }}>
