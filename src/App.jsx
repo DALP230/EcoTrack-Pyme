@@ -252,9 +252,12 @@ function App() {
             <h2 style={{ color: '#065f46', marginTop: 0 }}>📊 Panel de Sostenibilidad</h2>
             <p style={{ color: '#4b5563', margin: 0 }}>Gestiona y visualiza tu impacto ambiental en tiempo real.</p>
           </div>
-          <button onClick={generarReportePDF} style={{ padding: '12px 20px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-            🖨️ Descargar Reporte PDF
-          </button>
+          {/* EL BOTÓN DE PDF AHORA SOLO LO VE EL ADMINISTRADOR */}
+          {userRol === 'admin' && (
+            <button onClick={generarReportePDF} style={{ padding: '12px 20px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+              🖨️ Descargar Reporte PDF
+            </button>
+          )}
         </div>
 
         <div style={{ ...cardStyle, marginBottom: '30px' }}>
