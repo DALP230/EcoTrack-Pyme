@@ -146,8 +146,8 @@ function App() {
   }
 
   // --- VISTA 3: DASHBOARD ---
-  // Tomamos el último registro que llegó de la base de datos en Neon para la gráfica
-  const ultimoRegistro = registros.length > 0 ? registros[0] : { organicos: 0, inorganicos: 0, otros: 0 };
+  // Protegemos la variable por si el dato tarda en llegar o viene vacío
+  const ultimoRegistro = registros[0] || {};
 
   const pieData = [
     { name: 'Orgánicos', value: Number(ultimoRegistro.organicos) || 0 },
