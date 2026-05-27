@@ -226,16 +226,33 @@ function App() {
                       <button onClick={async () => {
                         const nuevaLuz = prompt("Nuevo valor de LUZ (kWh):", r.luz);
                         if (nuevaLuz === null) return;
+                        
                         const nuevaAgua = prompt("Nuevo valor de AGUA (m³):", r.agua);
                         if (nuevaAgua === null) return;
+
+                        const nuevosOrg = prompt("Nuevo valor de ORGÁNICOS (kg):", r.organicos || 0);
+                        if (nuevosOrg === null) return;
+
+                        const nuevosInorg = prompt("Nuevo valor de INORGÁNICOS (kg):", r.inorganicos || 0);
+                        if (nuevosInorg === null) return;
+
+                        const nuevosOtros = prompt("Nuevo valor de OTROS (kg):", r.otros || 0);
+                        if (nuevosOtros === null) return;
 
                         const idRegistro = r.id || r.id_registro; // Soporta ambos nombres de columna
                         try {
                           const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/registros/${idRegistro}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ luz: Number(nuevaLuz), agua: Number(nuevaAgua) })
+                            body: JSON.stringify({ 
+                              luz: Number(nuevaLuz), 
+                              agua: Number(nuevaAgua),
+                              organicos: Number(nuevosOrg),
+                              inorganicos: Number(nuevosInorg),
+                              otros: Number(nuevosOtros)
+                            })
                           });
+                          
                           if (res.ok) {
                             alert("✅ Actualizado en Neon (PostgreSQL)");
                             cargarDatos();
