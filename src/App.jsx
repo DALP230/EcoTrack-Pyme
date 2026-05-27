@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
   LineChart, Line, CartesianGrid, Legend, PieChart, Pie, Cell 
 } from 'recharts';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf'; // IMPORTACIÓN CORREGIDA CON LLAVES
 import 'jspdf-autotable';
 
 const logoUrl = '/logo-ecotrack.png'; 
@@ -50,49 +50,60 @@ function App() {
     setUserRol('user');
   };
 
-  // --- FUNCIÓN PARA GENERAR EL PDF PROFESIONAL ---
+  // --- FUNCIÓN PARA GENERAR EL PDF CORREGIDA Y PROTEGIDA ---
   const generarReportePDF = () => {
-    const doc = new jsPDF();
-    
-    // Título principal
-    doc.setFontSize(20);
-    doc.setTextColor(6, 95, 70); // Verde EcoTrack
-    doc.text("Reporte de Sostenibilidad - EcoTrack", 14, 22);
-    
-    // Información del reporte y usuario
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text(`Empresa: ${companyData.nombreComercial || 'EcoTrack Principal'}`, 14, 32);
-    doc.text(`Generado por: ${userData.nombre} (Rol: ${userRol.toUpperCase()})`, 14, 38);
-    doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`, 14, 44);
+    try {
+      const doc = new jsPDF();
+      
+      // Título principal
+      doc.setFontSize(20);
+      doc.setTextColor(6, 95, 70); // Verde EcoTrack
+      doc.text("Reporte de Sostenibilidad - EcoTrack", 14, 22);
+      
+      // Información del reporte y usuario
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      doc.text(`Empresa: ${companyData.nombreComercial || 'EcoTrack Principal'}`, 14, 32);
+      doc.text(`Generado por: ${userData.nombre || 'Usuario'} (Rol: ${(userRol || 'user').toUpperCase()})`, 14, 38);
+      doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`, 14, 44);
 
-    // Preparar los datos para la tabla
-    const tableColumn = ["Fecha", "Luz (kWh)", "Agua (m³)", "Residuos Totales (kg)"];
-    const tableRows = [];
+      // Preparar los datos para la tabla
+      const tableColumn = ["Fecha", "Luz (kWh)", "Agua (m³)", "Residuos Totales (kg)"];
+      const tableRows = [];
 
-    registros.forEach(r => {
-      const totalResiduos = Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0);
-      const rowData = [
-        new Date(r.fecha_registro).toLocaleDateString(),
-        r.luz,
-        r.agua,
-        totalResiduos
-      ];
-      tableRows.push(rowData);
-    });
+      // Validar si hay registros
+      if (registros && registros.length > 0) {
+        registros.forEach(r => {
+          const totalResiduos = Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0);
+          const fecha = r.fecha_registro ? new Date(r.fecha_registro).toLocaleDateString() : new Date().toLocaleDateString();
+          const rowData = [
+            fecha,
+            r.luz || 0,
+            r.agua || 0,
+            totalResiduos
+          ];
+          tableRows.push(rowData);
+        });
+      } else {
+        tableRows.push(["Sin datos", "0", "0", "0"]);
+      }
 
-    // Dibujar la tabla en el PDF
-    doc.autoTable({
-      head: [tableColumn],
-      body: tableRows,
-      startY: 50, // Empieza debajo del texto
-      styles: { fontSize: 10, cellPadding: 3 },
-      headStyles: { fillColor: [16, 185, 129] }, // Color verde del header
-      alternateRowStyles: { fillColor: [243, 244, 246] } // Color gris para filas alternas
-    });
+      // Dibujar la tabla en el PDF
+      doc.autoTable({
+        head: [tableColumn],
+        body: tableRows,
+        startY: 50,
+        styles: { fontSize: 10, cellPadding: 3 },
+        headStyles: { fillColor: [16, 185, 129] }, // Color verde del header
+        alternateRowStyles: { fillColor: [243, 244, 246] } // Color gris para filas alternas
+      });
 
-    // Guardar el documento
-    doc.save("Reporte_EcoTrack.pdf");
+      // Guardar el documento
+      doc.save("Reporte_EcoTrack.pdf");
+    } catch (error) {
+      console.error("Error completo del PDF:", error);
+      alert("Error al generar el PDF: " + error.message);
+    }
   };
 
   const cardStyle = { 
@@ -220,12 +231,12 @@ function App() {
       </header>
 
       <main style={{ padding: '40px' }}>
+        {/* EL BOTÓN AHORA ES VISIBLE PARA TODOS (RESPETANDO LOS PERMISOS) */}
         <div style={{ ...cardStyle, marginBottom: '30px', borderLeft: '6px solid #10b981', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h2 style={{ color: '#065f46', marginTop: 0 }}>📊 Panel de Sostenibilidad</h2>
             <p style={{ color: '#4b5563', margin: 0 }}>Gestiona y visualiza tu impacto ambiental en tiempo real.</p>
           </div>
-          {/* BOTÓN OFICIAL DE PDF */}
           <button onClick={generarReportePDF} style={{ padding: '12px 20px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
             🖨️ Descargar Reporte PDF
           </button>
