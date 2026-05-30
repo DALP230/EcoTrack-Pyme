@@ -6,7 +6,9 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const logoUrl = '/logo-ecotrack.png'; 
+// --- DEFINICIÓN DE LOGOS SEGÚN LA VISTA ---
+const loginLogoUrl = '/Logo-Ecotrack (2).png'; // Logo grande para la pantalla de Login
+const dashboardHeaderLogoUrl = '/logo-ecotrack.png'; // Logo horizontal para el encabezado del Dashboard
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false); 
@@ -129,11 +131,19 @@ function App() {
     border: '1px solid #d1fae5'
   };
 
-  // --- VISTA 1: LOGIN ---
+  // --- VISTA 1: LOGIN (AHORA CON LOGO PEGAO AL CUADRO) ---
   if (!isLoggedIn) {
     return (
-      <div style={{ height: '100vh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'center', background: 'linear-gradient(135deg, #064e3b 0%, #16a34a 100%)' }}>
-        <div style={{ backgroundColor: '#fff', padding: '40px', borderRadius: '25px', width: '400px', textAlign: 'center', boxShadow: '0 15px 35px rgba(0,0,0,0.2)' }}>
+      <div style={{ minHeight: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'linear-gradient(135deg, #064e3b 0%, #16a34a 100%)', padding: '20px', boxSizing: 'border-box' }}>
+        
+        {/* SECCIÓN DE IMÁGENES: LOGO GRANDE */}
+        {/* === AQUÍ ESTÁ EL CAMBIO DE DISEÑO: marginBottom reducido de 25px a 5px === */}
+        <div style={{ textAlign: 'center', marginBottom: '5px', width: '100%', maxWidth: '700px' }}>
+          <img src={loginLogoUrl} alt="Logo Grande" style={{ height: '350px', width: 'auto', marginBottom: '0px', objectFit: 'contain' }} />
+        </div>
+
+        {/* TARJETA DE FORMULARIO INTACTA */}
+        <div style={{ backgroundColor: '#fff', padding: '40px', borderRadius: '25px', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 15px 35px rgba(0,0,0,0.2)', boxSizing: 'border-box' }}>
           <h2 style={{ color: '#065f46', marginBottom: '20px' }}>{isRegistering ? 'Crear Cuenta Personal' : 'EcoTrack Login'}</h2>
           <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {isRegistering && (
@@ -193,6 +203,36 @@ function App() {
             {isRegistering ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate aquí'}
           </button>
         </div>
+
+        {/* --- NUEVA SECCIÓN DE LOS 4 BENEFICIOS INTEGRADA --- */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '40px', marginTop: '60px', color: 'white', textAlign: 'center', maxWidth: '1000px' }}>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '200px' }}>
+            <img src="/ahorro.png" alt="Ahorro de recursos" style={{ width: '70px', height: '70px', marginBottom: '15px', objectFit: 'contain' }} />
+            <h3 style={{ fontSize: '15px', marginBottom: '10px', fontWeight: 'bold', letterSpacing: '0.5px' }}>AHORRO DE RECURSOS</h3>
+            <p style={{ fontSize: '13px', lineHeight: '1.4', opacity: '0.9', margin: 0 }}>Identifica y reduce consumos innecesarios para disminuir costos.</p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '200px' }}>
+            <img src="/destaca.png" alt="Cumple y destaca" style={{ width: '70px', height: '70px', marginBottom: '15px', objectFit: 'contain' }} />
+            <h3 style={{ fontSize: '15px', marginBottom: '10px', fontWeight: 'bold', letterSpacing: '0.5px' }}>CUMPLE Y DESTACA</h3>
+            <p style={{ fontSize: '13px', lineHeight: '1.4', opacity: '0.9', margin: 0 }}>Facilita el cumplimiento normativo y mejora tu imagen sostenible.</p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '200px' }}>
+            <img src="/decisiones.png" alt="Decisiones inteligentes" style={{ width: '70px', height: '70px', marginBottom: '15px', objectFit: 'contain' }} />
+            <h3 style={{ fontSize: '15px', marginBottom: '10px', fontWeight: 'bold', letterSpacing: '0.5px' }}>DECISIONES INTELIGENTES</h3>
+            <p style={{ fontSize: '13px', lineHeight: '1.4', opacity: '0.9', margin: 0 }}>Datos claros y en tiempo real para mejores decisiones.</p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '200px' }}>
+            <img src="/nube.png" alt="Fácil y accesible" style={{ width: '70px', height: '70px', marginBottom: '15px', objectFit: 'contain' }} />
+            <h3 style={{ fontSize: '15px', marginBottom: '10px', fontWeight: 'bold', letterSpacing: '0.5px' }}>FÁCIL Y ACCESIBLE</h3>
+            <p style={{ fontSize: '13px', lineHeight: '1.4', opacity: '0.9', margin: 0 }}>Plataforma accesible y escalable.</p>
+          </div>
+
+        </div>
+
       </div>
     );
   }
@@ -217,7 +257,7 @@ function App() {
     );
   }
 
-  // --- VISTA 3: DASHBOARD ---
+  // --- VISTA 3: DASHBOARD (AHORA CON EL LOGO HORIZONTAL) ---
   const ultimoRegistro = registros[0] || {};
 
   const pieDataRaw = [
@@ -234,7 +274,8 @@ function App() {
     <div style={{ width: '100vw', minHeight: '100vh', backgroundColor: '#ecfdf5', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif' }}>
       <header style={{ padding: '15px 50px', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '4px solid #10b981' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <img src={logoUrl} alt="Logo" style={{ height: '50px' }} />
+          {/* === AQUÍ ESTÁ EL CAMBIO DE LOGO: Ahora usa dashboardHeaderLogoUrl (logo-ecotrack.png) === */}
+          <img src={dashboardHeaderLogoUrl} alt="Logo Horizontal" style={{ height: '70px', objectFit: 'contain' }} />
           <h1 style={{ color: '#065f46', margin: 0 }}>EcoTrack</h1>
         </div>
         <div style={{display:'flex', alignItems:'center', gap: '20px'}}>
