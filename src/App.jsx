@@ -13,16 +13,33 @@ const dashboardHeaderLogoUrl = '/logo-ecotrack.png'; // Logo horizontal para el 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false); 
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isRecovering, setIsRecovering] = useState(false); // Estado para vista de recuperación
+  const [isLoggingIn, setIsLoggingIn] = useState(false); // Estado para evitar doble clic
+  
   const [hasCompany, setHasCompany] = useState(false);
   const [userRol, setUserRol] = useState('user');
   const [userData, setUserData] = useState({ nombre: '' });
   const [companyData, setCompanyData] = useState({ nombreComercial: '', rfc: '', ciudad: '' });
   const [formData, setFormData] = useState({ nombre: '', correo: '', password: '' });
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  
   const [registros, setRegistros] = useState([]);
 
-  const [luz, setLuz] = useState({ actual: 0, anterior: 0 });
-  const [agua, setAgua] = useState({ actual: 0, anterior: 0 });
-  const [residuos, setResiduos] = useState({ organicos: 0, inorganicos: 0, otros: 0 });
+  // Estados para nuevos registros
+  const [luz, setLuz] = useState({ actual: '' });
+  const [agua, setAgua] = useState({ actual: '' });
+  const [residuos, setResiduos] = useState({ organicos: '', inorganicos: '', otros: '' });
+
+  // Estados para Edición CRUD Inline (directo en la tabla)
+  const [editingRowId, setEditingRowId] = useState(null);
+  const [editRowData, setEditRowData] = useState({});
+
+  // --- ESTADOS PARA EL CHATBOT ---
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState([
+    { sender: 'bot', text: '¡Hola! Soy EcoBot 🍃. ¿En qué puedo ayudarte hoy?' }
+  ]);
 
   const cargarDatos = async () => {
     try {
@@ -30,10 +47,6 @@ function App() {
       const data = await res.json();
       if (Array.isArray(data)) {
         setRegistros(data);
-        if (data.length > 0) {
-          setLuz(prev => ({ ...prev, anterior: data[0].luz || 0 }));
-          setAgua(prev => ({ ...prev, anterior: data[0].agua || 0 }));
-        }
       }
     } catch (error) {
       console.error("Error cargando historial:", error);
@@ -52,51 +65,83 @@ function App() {
     setUserRol('user');
   };
 
-  // --- FUNCIÓN DE CONTROL DE FECHAS SEGURA ---
   const formatearFecha = (fechaRaw) => {
     if (!fechaRaw) return new Date().toLocaleDateString();
     const d = new Date(fechaRaw);
     return isNaN(d.getTime()) ? new Date().toLocaleDateString() : d.toLocaleDateString();
   };
 
-  // --- FUNCIÓN PARA GENERAR EL PDF CORREGIDA Y PROTEGIDA ---
+  // --- LÓGICA DE RESPUESTAS DEL CHATBOT ---
+  const gestionarEnvioMensaje = (textoDirecto = null) => {
+    const textoAEnviar = textoDirecto || chatInput;
+    if (!textoAEnviar.trim()) return;
+
+    const nuevoMensajeUsuario = { sender: 'user', text: textoAEnviar };
+    setChatMessages(prev => [...prev, nuevoMensajeUsuario]);
+    const textoGuardado = textoAEnviar.toLowerCase();
+    
+    if (!textoDirecto) setChatInput('');
+
+    // Simulamos respuesta del bot
+    setTimeout(() => {
+      let respuestaBot = 'Lo siento, sigo aprendiendo. Si tienes problemas técnicos o con tu cuenta, por favor contacta a soporte@ecotrack.com 📧';
+
+      if (textoGuardado.includes('hola') || textoGuardado.includes('buenos') || textoGuardado.includes('buenas')) {
+        respuestaBot = '¡Hola! Bienvenido a EcoTrack. Estoy aquí para resolver tus dudas de inicio de sesión o soporte básico. 🌍';
+      } else if (textoGuardado.includes('contraseña') || textoGuardado.includes('password') || textoGuardado.includes('entrar')) {
+        respuestaBot = 'Si olvidaste tu contraseña, haz clic en "Olvidé mi contraseña" debajo del formulario para iniciar la recuperación.';
+      } else if (textoGuardado.includes('registro') || textoGuardado.includes('cuenta') || textoGuardado.includes('crear')) {
+        respuestaBot = 'Puedes crear una cuenta personal haciendo clic en la opción "¿No tienes cuenta? Regístrate aquí" que está debajo del botón verde.';
+      } else if (textoGuardado.includes('que es') || textoGuardado.includes('ecotrack') || textoGuardado.includes('funciona')) {
+        respuestaBot = 'EcoTrack es una plataforma en la nube diseñada para auditar y controlar el impacto ecológico corporativo, monitoreando consumos de forma inteligente.';
+      }
+
+      setChatMessages(prev => [...prev, { sender: 'bot', text: respuestaBot }]);
+    }, 700);
+  };
+
+  // --- FILTRO Y GENERACIÓN DEL PDF (SOLO MES ACTUAL) ---
   const generarReportePDF = () => {
     try {
+      const fechaActual = new Date();
+      const mesActual = fechaActual.getMonth();
+      const anoActual = fechaActual.getFullYear();
+
+      // Filtrar registros SOLO de este mes
+      const registrosDelMes = registros.filter(r => {
+        const d = new Date(r.fecha_registro);
+        return d.getMonth() === mesActual && d.getFullYear() === anoActual;
+      });
+
+      if (registrosDelMes.length === 0) {
+        return alert("No hay registros almacenados en el mes actual para exportar.");
+      }
+
       const doc = new jsPDF();
-      
-      // Título principal
       doc.setFontSize(20);
-      doc.setTextColor(6, 95, 70); // Verde EcoTrack
-      doc.text("Reporte de Sostenibilidad - EcoTrack", 14, 22);
+      doc.setTextColor(6, 95, 70);
+      doc.text("Reporte de Sostenibilidad Mensual - EcoTrack", 14, 22);
       
-      // Información del reporte y usuario
       doc.setFontSize(11);
       doc.setTextColor(100);
       doc.text(`Empresa: ${companyData.nombreComercial || 'EcoTrack Principal'}`, 14, 32);
       doc.text(`Generado por: ${userData.nombre || 'Usuario'} (Rol: ${(userRol || 'user').toUpperCase()})`, 14, 38);
-      doc.text(`Fecha de emisión: ${new Date().toLocaleDateString()}`, 14, 44);
+      doc.text(`Fecha de emisión: ${fechaActual.toLocaleDateString()}`, 14, 44);
 
-      // Preparar los datos para la tabla
       const tableColumn = ["Fecha", "Luz (kWh)", "Agua (m³)", "Residuos Totales (kg)"];
       const tableRows = [];
 
-      // Validar si hay registros
-      if (registros && registros.length > 0) {
-        registros.forEach(r => {
-          const totalResiduos = Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0);
-          const rowData = [
-            formatearFecha(r.fecha_registro),
-            r.luz || 0,
-            r.agua || 0,
-            totalResiduos
-          ];
-          tableRows.push(rowData);
-        });
-      } else {
-        tableRows.push(["Sin datos", "0", "0", "0"]);
-      }
+      registrosDelMes.forEach(r => {
+        const totalResiduos = Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0);
+        const rowData = [
+          formatearFecha(r.fecha_registro),
+          r.luz || 0,
+          r.agua || 0,
+          totalResiduos
+        ];
+        tableRows.push(rowData);
+      });
 
-      // Sistema híbrido de renderizado autoTable anti-fallos de compilador (Vite/Webpack)
       const opcionesTabla = {
         head: [tableColumn],
         body: tableRows,
@@ -114,8 +159,7 @@ function App() {
         throw new Error("No se pudo vincular el generador de tablas jsPDF.");
       }
 
-      // Guardar el documento
-      doc.save("Reporte_EcoTrack.pdf");
+      doc.save(`Reporte_EcoTrack_${mesActual + 1}_${anoActual}.pdf`);
     } catch (error) {
       console.error("Error completo del PDF:", error);
       alert("Error al generar el PDF: " + error.message);
@@ -131,106 +175,192 @@ function App() {
     border: '1px solid #d1fae5'
   };
 
-  // --- VISTA 1: LOGIN (AHORA CON LOGO PEGAO AL CUADRO) ---
+  // ==========================================
+  // VISTA 1: LOGIN, REGISTRO Y RECUPERACIÓN
+  // ==========================================
   if (!isLoggedIn) {
     return (
-      <div style={{ minHeight: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'linear-gradient(135deg, #064e3b 0%, #16a34a 100%)', padding: '20px', boxSizing: 'border-box' }}>
+      <div style={{ minHeight: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: 'linear-gradient(135deg, #064e3b 0%, #16a34a 100%)', padding: '40px 20px', boxSizing: 'border-box', position: 'relative' }}>
         
-        {/* SECCIÓN DE IMÁGENES: LOGO GRANDE */}
-        {/* === AQUÍ ESTÁ EL CAMBIO DE DISEÑO: marginBottom reducido de 25px a 5px === */}
+        {/* LOGO GRANDE PEGAO AL CUADRO */}
         <div style={{ textAlign: 'center', marginBottom: '5px', width: '100%', maxWidth: '700px' }}>
           <img src={loginLogoUrl} alt="Logo Grande" style={{ height: '350px', width: 'auto', marginBottom: '0px', objectFit: 'contain' }} />
         </div>
 
-        {/* TARJETA DE FORMULARIO INTACTA */}
+        {/* TARJETA DE FORMULARIO */}
         <div style={{ backgroundColor: '#fff', padding: '40px', borderRadius: '25px', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 15px 35px rgba(0,0,0,0.2)', boxSizing: 'border-box' }}>
-          <h2 style={{ color: '#065f46', marginBottom: '20px' }}>{isRegistering ? 'Crear Cuenta Personal' : 'EcoTrack Login'}</h2>
-          <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {isRegistering && (
-              <input type="text" placeholder="Tu nombre" style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
-                onChange={(e) => setFormData({...formData, nombre: e.target.value})} />
-            )}
-            <input type="email" placeholder="Correo electrónico" style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
-              onChange={(e) => setFormData({...formData, correo: e.target.value})} />
-            <input type="password" placeholder="Contraseña" style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
-              onChange={(e) => setFormData({...formData, password: e.target.value})} />
-            
-            <button onClick={async () => {
-              if (!formData.correo || !formData.password) return alert("Llena los campos");
-
-              const url = isRegistering ? 'registro' : 'login';
-              
-              try {
-                const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/${url}`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(formData)
-                });
+          
+          {isRecovering ? (
+            // INTERFAZ DE RECUPERACIÓN DE CONTRASEÑA
+            <>
+              <h2 style={{ color: '#065f46', marginBottom: '20px' }}>Recuperar Contraseña</h2>
+              <p style={{ fontSize: '14px', color: '#4b5563', marginBottom: '20px' }}>Ingresa tu correo y te enviaremos las instrucciones.</p>
+              <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <input type="email" placeholder="Correo electrónico" style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
+                  value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)} />
+                <button type="button" onClick={() => {
+                  if(!recoveryEmail) return alert("Por favor ingresa tu correo.");
+                  alert(`Las instrucciones han sido enviadas a ${recoveryEmail}`);
+                  setIsRecovering(false);
+                }} style={{ padding: '12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  ENVIAR ENLACE
+                </button>
+              </form>
+              <button onClick={() => setIsRecovering(false)} style={{ marginTop: '20px', background: 'none', border: 'none', color: '#059669', cursor: 'pointer', textDecoration: 'underline' }}>
+                Volver al inicio de sesión
+              </button>
+            </>
+          ) : (
+            // INTERFAZ DE LOGIN Y REGISTRO
+            <>
+              <h2 style={{ color: '#065f46', marginBottom: '20px' }}>{isRegistering ? 'Crear Cuenta Personal' : 'EcoTrack Login'}</h2>
+              <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                {isRegistering && (
+                  <input type="text" placeholder="Tu nombre" style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
+                    onChange={(e) => setFormData({...formData, nombre: e.target.value})} />
+                )}
+                <input type="email" placeholder="Correo electrónico" style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
+                  onChange={(e) => setFormData({...formData, correo: e.target.value})} />
+                <input type="password" placeholder="Contraseña" style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
+                  onChange={(e) => setFormData({...formData, password: e.target.value})} />
                 
-                const data = await res.json();
+                <button disabled={isLoggingIn} onClick={async () => {
+                  if (!formData.correo || !formData.password) return alert("Llena todos los campos.");
+                  if (isRegistering && !formData.nombre) return alert("Por favor ingresa tu nombre.");
+                  // Validación para no aceptar números en el nombre
+                  if (isRegistering && /\d/.test(formData.nombre)) return alert("El nombre no puede contener números.");
 
-                if (res.ok) {
-                  if (isRegistering) {
-                    alert("✅ Registro exitoso. ¡Inicia sesión!");
-                    setIsRegistering(false);
-                  } else {
-                    const correoIngresado = formData.correo.trim().toLowerCase();
+                  setIsLoggingIn(true); // Bloquear botón
+                  const url = isRegistering ? 'registro' : 'login';
+                  
+                  try {
+                    const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/${url}`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(formData)
+                    });
                     
-                    if (
-                      correoIngresado === 'lopezperezdavidantonio8@gmail.com' || 
-                      correoIngresado === '230i0030@martineztorre.tecnm.mx' ||
-                      correoIngresado === 'solecitocortes75@gmail.com'
-                    ) {
-                      setUserRol('admin');
+                    const data = await res.json();
+
+                    if (res.ok) {
+                      if (isRegistering) {
+                        alert("✅ Registro exitoso. ¡Inicia sesión!");
+                        setIsRegistering(false);
+                      } else {
+                        const correoIngresado = formData.correo.trim().toLowerCase();
+                        if (
+                          correoIngresado === 'lopezperezdavidantonio8@gmail.com' || 
+                          correoIngresado === '230i0030@martineztorre.tecnm.mx' ||
+                          correoIngresado === 'solecitocortes75@gmail.com'
+                        ) {
+                          setUserRol('admin');
+                        } else {
+                          setUserRol('user');
+                        }
+                        setIsLoggedIn(true); 
+                        setUserData({ nombre: data.nombre || 'Usuario' });
+                      }
                     } else {
-                      setUserRol('user');
+                      alert(data.message || "Error en el acceso");
                     }
-                    
-                    setIsLoggedIn(true); 
-                    setUserData({ nombre: data.nombre || 'Usuario' });
+                  } catch (error) {
+                    alert("Error de conexión con el servidor");
+                  } finally {
+                    setIsLoggingIn(false); // Desbloquear botón
                   }
-                } else {
-                  alert(data.message || "Error en el acceso");
-                }
-              } catch (error) {
-                alert("Error de conexión con el servidor");
-              }
-            }} type="button" style={{ padding: '12px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
-              {isRegistering ? 'REGISTRARME' : 'ENTRAR'}
-            </button>
-          </form>
-          <button onClick={() => setIsRegistering(!isRegistering)} style={{ marginTop: '20px', background: 'none', border: 'none', color: '#059669', cursor: 'pointer', textDecoration: 'underline' }}>
-            {isRegistering ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate aquí'}
-          </button>
+                }} type="button" style={{ padding: '12px', background: isLoggingIn ? '#9ca3af' : '#10b981', color: '#fff', border: 'none', borderRadius: '8px', cursor: isLoggingIn ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
+                  {isLoggingIn ? 'Cargando... (El servidor está despertando)' : (isRegistering ? 'REGISTRARME' : 'ENTRAR')}
+                </button>
+              </form>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+                <button onClick={() => setIsRegistering(!isRegistering)} style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer', textDecoration: 'underline' }}>
+                  {isRegistering ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate aquí'}
+                </button>
+                {!isRegistering && (
+                  <button onClick={() => setIsRecovering(true)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '13px' }}>
+                    ¿Olvidaste tu contraseña?
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
-        {/* --- NUEVA SECCIÓN DE LOS 4 BENEFICIOS INTEGRADA --- */}
+        {/* SECCIÓN DE LOS 4 BENEFICIOS */}
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '40px', marginTop: '60px', color: 'white', textAlign: 'center', maxWidth: '1000px' }}>
-          
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '200px' }}>
             <img src="/ahorro.png" alt="Ahorro de recursos" style={{ width: '70px', height: '70px', marginBottom: '15px', objectFit: 'contain' }} />
             <h3 style={{ fontSize: '15px', marginBottom: '10px', fontWeight: 'bold', letterSpacing: '0.5px' }}>AHORRO DE RECURSOS</h3>
             <p style={{ fontSize: '13px', lineHeight: '1.4', opacity: '0.9', margin: 0 }}>Identifica y reduce consumos innecesarios para disminuir costos.</p>
           </div>
-
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '200px' }}>
             <img src="/destaca.png" alt="Cumple y destaca" style={{ width: '70px', height: '70px', marginBottom: '15px', objectFit: 'contain' }} />
             <h3 style={{ fontSize: '15px', marginBottom: '10px', fontWeight: 'bold', letterSpacing: '0.5px' }}>CUMPLE Y DESTACA</h3>
             <p style={{ fontSize: '13px', lineHeight: '1.4', opacity: '0.9', margin: 0 }}>Facilita el cumplimiento normativo y mejora tu imagen sostenible.</p>
           </div>
-
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '200px' }}>
             <img src="/decisiones.png" alt="Decisiones inteligentes" style={{ width: '70px', height: '70px', marginBottom: '15px', objectFit: 'contain' }} />
             <h3 style={{ fontSize: '15px', marginBottom: '10px', fontWeight: 'bold', letterSpacing: '0.5px' }}>DECISIONES INTELIGENTES</h3>
             <p style={{ fontSize: '13px', lineHeight: '1.4', opacity: '0.9', margin: 0 }}>Datos claros y en tiempo real para mejores decisiones.</p>
           </div>
-
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '200px' }}>
             <img src="/nube.png" alt="Fácil y accesible" style={{ width: '70px', height: '70px', marginBottom: '15px', objectFit: 'contain' }} />
             <h3 style={{ fontSize: '15px', marginBottom: '10px', fontWeight: 'bold', letterSpacing: '0.5px' }}>FÁCIL Y ACCESIBLE</h3>
             <p style={{ fontSize: '13px', lineHeight: '1.4', opacity: '0.9', margin: 0 }}>Plataforma accesible y escalable.</p>
           </div>
+        </div>
 
+        {/* CHATBOT FLOTANTE POTENCIADO */}
+        <div style={{ position: 'fixed', bottom: '30px', right: '30px', zIndex: 1000, fontFamily: 'sans-serif' }}>
+          {isChatOpen ? (
+            <div style={{ width: '320px', height: '460px', backgroundColor: '#fff', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: '1px solid #10b981' }}>
+              <div style={{ backgroundColor: '#064e3b', color: '#fff', padding: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '20px' }}>🍃</span>
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontWeight: 'bold', fontSize: '14px' }}>EcoBot Soporte</div>
+                    <div style={{ fontSize: '11px', opacity: 0.8 }}>En línea ahora</div>
+                  </div>
+                </div>
+                <button onClick={() => setIsChatOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}>✕</button>
+              </div>
+
+              <div style={{ flex: 1, padding: '15px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', backgroundColor: '#f9fafb' }}>
+                {chatMessages.map((msg, index) => (
+                  <div key={index} style={{ alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%', padding: '10px 14px', borderRadius: '12px', fontSize: '13px', lineHeight: '1.4', textAlign: 'left',
+                    backgroundColor: msg.sender === 'user' ? '#10b981' : '#e5e7eb',
+                    color: msg.sender === 'user' ? '#fff' : '#1f2937'
+                  }}>
+                    {msg.text}
+                  </div>
+                ))}
+              </div>
+
+              {/* Botones de preguntas rápidas */}
+              <div style={{ display: 'flex', gap: '5px', padding: '5px 10px', overflowX: 'auto', backgroundColor: '#f3f4f6', borderTop: '1px solid #e5e7eb' }}>
+                <button onClick={() => gestionarEnvioMensaje('Olvidé mi contraseña')} style={{ whiteSpace: 'nowrap', padding: '5px 10px', borderRadius: '15px', border: '1px solid #10b981', background: '#fff', color: '#10b981', fontSize: '11px', cursor: 'pointer' }}>Contraseña</button>
+                <button onClick={() => gestionarEnvioMensaje('¿Qué es EcoTrack?')} style={{ whiteSpace: 'nowrap', padding: '5px 10px', borderRadius: '15px', border: '1px solid #10b981', background: '#fff', color: '#10b981', fontSize: '11px', cursor: 'pointer' }}>¿Qué es?</button>
+                <button onClick={() => gestionarEnvioMensaje('¿Cómo crear cuenta?')} style={{ whiteSpace: 'nowrap', padding: '5px 10px', borderRadius: '15px', border: '1px solid #10b981', background: '#fff', color: '#10b981', fontSize: '11px', cursor: 'pointer' }}>Crear cuenta</button>
+              </div>
+
+              <div style={{ padding: '10px', display: 'flex', gap: '8px', backgroundColor: '#fff' }}>
+                <input type="text" placeholder="Escribe tu duda..." value={chatInput} 
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') gestionarEnvioMensaje(); }}
+                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '13px', outline: 'none' }} 
+                />
+                <button onClick={() => gestionarEnvioMensaje()} style={{ backgroundColor: '#10b981', color: '#fff', border: 'none', padding: '0 15px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
+                  Enviar
+                </button>
+              </div>
+            </div>
+          ) : (
+            // === AQUÍ AGRANDAMOS EL ICONO DEL CHATBOT A 75px ===
+            <button onClick={() => setIsChatOpen(true)} style={{ width: '75px', height: '75px', borderRadius: '50%', backgroundColor: '#10b981', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '32px', display: 'flex', justifyContent: 'center', alignItems: 'center', boxShadow: '0 4px 15px rgba(16, 185, 129, 0.5)', transition: 'transform 0.2s' }}>
+              💬
+            </button>
+          )}
         </div>
 
       </div>
@@ -257,7 +387,7 @@ function App() {
     );
   }
 
-  // --- VISTA 3: DASHBOARD (AHORA CON EL LOGO HORIZONTAL) ---
+  // --- VISTA 3: DASHBOARD ---
   const ultimoRegistro = registros[0] || {};
 
   const pieDataRaw = [
@@ -266,7 +396,6 @@ function App() {
     { name: 'Otros', value: Number(ultimoRegistro.otros) || 0 },
   ].filter(d => d.value > 0);
 
-  // Solución definitiva al error de renderizado del PieChart vacío
   const datosGraficoPastel = pieDataRaw.length > 0 ? pieDataRaw : [{ name: 'Sin datos', value: 1 }];
   const coloresPastel = pieDataRaw.length > 0 ? ['#4ade80', '#10b981', '#064e3b'] : ['#cbd5e1'];
 
@@ -274,7 +403,6 @@ function App() {
     <div style={{ width: '100vw', minHeight: '100vh', backgroundColor: '#ecfdf5', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif' }}>
       <header style={{ padding: '15px 50px', backgroundColor: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '4px solid #10b981' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          {/* === AQUÍ ESTÁ EL CAMBIO DE LOGO: Ahora usa dashboardHeaderLogoUrl (logo-ecotrack.png) === */}
           <img src={dashboardHeaderLogoUrl} alt="Logo Horizontal" style={{ height: '70px', objectFit: 'contain' }} />
           <h1 style={{ color: '#065f46', margin: 0 }}>EcoTrack</h1>
         </div>
@@ -293,10 +421,9 @@ function App() {
             <h2 style={{ color: '#065f46', marginTop: 0 }}>📊 Panel de Sostenibilidad</h2>
             <p style={{ color: '#4b5563', margin: 0 }}>Gestiona y visualiza tu impacto ambiental en tiempo real.</p>
           </div>
-          {/* EL BOTÓN DE PDF AHORA SOLO LO VE EL ADMINISTRADOR */}
           {userRol === 'admin' && (
             <button onClick={generarReportePDF} style={{ padding: '12px 20px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-              🖨️ Descargar Reporte PDF
+              🖨️ Descargar Reporte PDF (Mes Actual)
             </button>
           )}
         </div>
@@ -304,19 +431,35 @@ function App() {
         <div style={{ ...cardStyle, marginBottom: '30px' }}>
           <h3 style={{marginTop:0, color:'#374151'}}>Nuevo Registro de Consumo</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr) auto', gap: '15px', alignItems: 'flex-end' }}>
-            <div><label style={{fontWeight:'bold'}}>⚡ Luz</label><input type="number" onChange={(e) => setLuz({...luz, actual: e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'2px solid #fbbf24'}} /></div>
-            <div><label style={{fontWeight:'bold'}}>💧 Agua</label><input type="number" onChange={(e) => setAgua({...agua, actual: e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'2px solid #38bdf8'}} /></div>
-            <div><label style={{fontWeight:'bold'}}>♻️ Org.</label><input type="number" onChange={(e) => setResiduos({...residuos, organicos: e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'2px solid #4ade80'}} /></div>
-            <div><label style={{fontWeight:'bold'}}>♻️ Inorg.</label><input type="number" onChange={(e) => setResiduos({...residuos, inorganicos: e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'2px solid #10b981'}} /></div>
-            <div><label style={{fontWeight:'bold'}}>♻️ Otros</label><input type="number" onChange={(e) => setResiduos({...residuos, otros: e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'2px solid #065f46'}} /></div>
+            {/* ETIQUETAS CON COLOR OSCURO PARA VISIBILIDAD */}
+            <div><label style={{fontWeight:'bold', color: '#1f2937'}}>⚡ Luz</label><input type="number" value={luz.actual} onChange={(e) => setLuz({actual: e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'2px solid #fbbf24'}} /></div>
+            <div><label style={{fontWeight:'bold', color: '#1f2937'}}>💧 Agua</label><input type="number" value={agua.actual} onChange={(e) => setAgua({actual: e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'2px solid #38bdf8'}} /></div>
+            <div><label style={{fontWeight:'bold', color: '#1f2937'}}>♻️ Org.</label><input type="number" value={residuos.organicos} onChange={(e) => setResiduos({...residuos, organicos: e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'2px solid #4ade80'}} /></div>
+            <div><label style={{fontWeight:'bold', color: '#1f2937'}}>♻️ Inorg.</label><input type="number" value={residuos.inorganicos} onChange={(e) => setResiduos({...residuos, inorganicos: e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'2px solid #10b981'}} /></div>
+            <div><label style={{fontWeight:'bold', color: '#1f2937'}}>♻️ Otros</label><input type="number" value={residuos.otros} onChange={(e) => setResiduos({...residuos, otros: e.target.value})} style={{width:'100%', padding:'10px', borderRadius:'8px', border:'2px solid #065f46'}} /></div>
+            
             <button onClick={async () => {
-                const payload = {luz: Number(luz.actual), agua: Number(agua.actual), organicos: Number(residuos.organicos), inorganicos: Number(residuos.inorganicos), otros: Number(residuos.otros)};
+                // VALIDACIÓN ESTRICTA: Sin vacíos ni negativos
+                if (luz.actual === '' || agua.actual === '' || residuos.organicos === '' || residuos.inorganicos === '' || residuos.otros === '') {
+                  return alert("❌ Error: No puedes dejar ningún campo vacío.");
+                }
+                const payload = { luz: Number(luz.actual), agua: Number(agua.actual), organicos: Number(residuos.organicos), inorganicos: Number(residuos.inorganicos), otros: Number(residuos.otros) };
+                
+                if (payload.luz < 0 || payload.agua < 0 || payload.organicos < 0 || payload.inorganicos < 0 || payload.otros < 0) {
+                  return alert("❌ Error: Los consumos no pueden ser números negativos.");
+                }
+
                 const res = await fetch('https://ecotrack-server-v1.onrender.com/api/registros', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify(payload)
                 });
-                if (res.ok) { alert("✅ Guardado en Neon (PostgreSQL)"); cargarDatos(); }
+                
+                if (res.ok) { 
+                  alert("✅ Guardado en Neon (PostgreSQL)"); 
+                  setLuz({actual: ''}); setAgua({actual: ''}); setResiduos({organicos: '', inorganicos: '', otros: ''});
+                  cargarDatos(); 
+                }
               }} style={{ padding: '12px 25px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px', cursor:'pointer', fontWeight:'bold' }}>GUARDAR</button>
           </div>
         </div>
@@ -329,84 +472,78 @@ function App() {
                 <th style={{ padding: '10px' }}>Fecha</th>
                 <th>Luz (kWh)</th>
                 <th>Agua (m³)</th>
-                <th>Residuos (kg)</th>
+                <th>Orgánicos</th>
+                <th>Inorgánicos</th>
+                <th>Otros</th>
                 {userRol === 'admin' && <th>Acciones CRUD</th>}
               </tr>
             </thead>
             <tbody style={{ color: '#1f2937' }}>
-              {registros.map((r, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: '12px', color: '#1f2937' }}>{formatearFecha(r.fecha_registro)}</td>
-                  <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.luz}</td>
-                  <td style={{ fontWeight: 'bold', color: '#1f2937' }}>{r.agua}</td>
-                  <td style={{ fontWeight: 'bold', color: '#1f2937' }}>
-                    {Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0)}
-                  </td>
-                  {userRol === 'admin' && (
-                    <td>
-                      <button onClick={async () => {
-                        const nuevaLuz = prompt("Nuevo valor de LUZ (kWh):", r.luz);
-                        if (nuevaLuz === null) return;
-                        
-                        const nuevaAgua = prompt("Nuevo valor de AGUA (m³):", r.agua);
-                        if (nuevaAgua === null) return;
+              {registros.map((r, i) => {
+                const idRegistro = r.id || r.id_registro;
+                const isEditing = editingRowId === idRegistro;
 
-                        const nuevosOrg = prompt("Nuevo valor de ORGÁNICOS (kg):", r.organicos || 0);
-                        if (nuevosOrg === null) return;
+                return (
+                  <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '12px', color: '#1f2937' }}>{formatearFecha(r.fecha_registro)}</td>
+                    
+                    {/* SI ESTÁ EDITANDO, MUESTRA INPUTS. SI NO, MUESTRA EL TEXTO NORMAL */}
+                    <td>{isEditing ? <input type="number" style={{ width: '60px' }} value={editRowData.luz} onChange={(e)=>setEditRowData({...editRowData, luz: e.target.value})} /> : <span style={{ fontWeight: 'bold' }}>{r.luz}</span>}</td>
+                    <td>{isEditing ? <input type="number" style={{ width: '60px' }} value={editRowData.agua} onChange={(e)=>setEditRowData({...editRowData, agua: e.target.value})} /> : <span style={{ fontWeight: 'bold' }}>{r.agua}</span>}</td>
+                    <td>{isEditing ? <input type="number" style={{ width: '60px' }} value={editRowData.organicos} onChange={(e)=>setEditRowData({...editRowData, organicos: e.target.value})} /> : <span style={{ fontWeight: 'bold' }}>{r.organicos || 0}</span>}</td>
+                    <td>{isEditing ? <input type="number" style={{ width: '60px' }} value={editRowData.inorganicos} onChange={(e)=>setEditRowData({...editRowData, inorganicos: e.target.value})} /> : <span style={{ fontWeight: 'bold' }}>{r.inorganicos || 0}</span>}</td>
+                    <td>{isEditing ? <input type="number" style={{ width: '60px' }} value={editRowData.otros} onChange={(e)=>setEditRowData({...editRowData, otros: e.target.value})} /> : <span style={{ fontWeight: 'bold' }}>{r.otros || 0}</span>}</td>
+                    
+                    {userRol === 'admin' && (
+                      <td>
+                        {isEditing ? (
+                          <>
+                            {/* BOTONES DE GUARDAR O CANCELAR EDICIÓN INLINE */}
+                            <button onClick={async () => {
+                              const { luz, agua, organicos, inorganicos, otros } = editRowData;
+                              if (luz === '' || agua === '' || organicos === '' || inorganicos === '' || otros === '') return alert("❌ Ningún campo puede quedar vacío.");
+                              if (Number(luz) < 0 || Number(agua) < 0 || Number(organicos) < 0 || Number(inorganicos) < 0 || Number(otros) < 0) return alert("❌ No se permiten números negativos.");
 
-                        const nuevosInorg = prompt("Nuevo valor de INORGÁNICOS (kg):", r.inorganicos || 0);
-                        if (nuevosInorg === null) return;
-
-                        const nuevosOtros = prompt("Nuevo valor de OTROS (kg):", r.otros || 0);
-                        if (nuevosOtros === null) return;
-
-                        const idRegistro = r.id || r.id_registro; 
-                        try {
-                          const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/registros/${idRegistro}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                              luz: Number(nuevaLuz), 
-                              agua: Number(nuevaAgua),
-                              organicos: Number(nuevosOrg),
-                              inorganicos: Number(nuevosInorg),
-                              otros: Number(nuevosOtros)
-                            })
-                          });
-                          
-                          if (res.ok) {
-                            alert("✅ Actualizado en Neon (PostgreSQL)");
-                            cargarDatos();
-                          } else {
-                            alert("Error al actualizar");
-                          }
-                        } catch (e) {
-                          alert("Error de red");
-                        }
-                      }} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', marginRight: '5px', cursor: 'pointer' }}>Editar</button>
-                      
-                      <button onClick={async () => {
-                        if(window.confirm("⚠️ ¿Estás completamente seguro de ELIMINAR este registro de PostgreSQL?")) {
-                          const idRegistro = r.id || r.id_registro;
-                          try {
-                            const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/registros/${idRegistro}`, {
-                              method: 'DELETE'
-                            });
-                            if (res.ok) {
-                              alert("🗑️ Eliminado de Neon (PostgreSQL)");
-                              cargarDatos();
-                            } else {
-                              alert("Error al eliminar");
-                            }
-                          } catch (e) {
-                            alert("Error de red");
-                          }
-                        }
-                      }} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Eliminar</button>
-                    </td>
-                  )}
-                </tr>
-              ))}
+                              try {
+                                const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/registros/${idRegistro}`, {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ 
+                                    luz: Number(luz), agua: Number(agua), organicos: Number(organicos), inorganicos: Number(inorganicos), otros: Number(otros)
+                                  })
+                                });
+                                if (res.ok) {
+                                  alert("✅ Registro Actualizado");
+                                  setEditingRowId(null);
+                                  cargarDatos();
+                                } else alert("Error al actualizar");
+                              } catch (e) { alert("Error de red"); }
+                            }} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', marginRight: '5px', cursor: 'pointer' }}>Guardar</button>
+                            <button onClick={() => setEditingRowId(null)} style={{ background: '#9ca3af', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Cancelar</button>
+                          </>
+                        ) : (
+                          <>
+                            {/* BOTONES DE INICIAR EDICIÓN O ELIMINAR */}
+                            <button onClick={() => {
+                              setEditingRowId(idRegistro);
+                              setEditRowData({ luz: r.luz, agua: r.agua, organicos: r.organicos || 0, inorganicos: r.inorganicos || 0, otros: r.otros || 0 });
+                            }} style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', marginRight: '5px', cursor: 'pointer' }}>Editar</button>
+                            
+                            <button onClick={async () => {
+                              if(window.confirm("⚠️ ¿Seguro que deseas ELIMINAR este registro?")) {
+                                try {
+                                  const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/registros/${idRegistro}`, { method: 'DELETE' });
+                                  if (res.ok) { alert("🗑️ Eliminado"); cargarDatos(); } else { alert("Error al eliminar"); }
+                                } catch (e) { alert("Error de red"); }
+                              }
+                            }} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer' }}>Eliminar</button>
+                          </>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
