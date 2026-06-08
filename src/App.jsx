@@ -7,7 +7,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 // --- DEFINICIÓN DE LOGOS SEGÚN LA VISTA ---
-const loginLogoUrl = '/Logo-Ecotrack (2).png'; 
+const loginLogoUrl = '/Logo-Ecotrack (2).png';
 const dashboardHeaderLogoUrl = '/logo-ecotrack.png'; 
 
 // ==========================================
@@ -62,10 +62,8 @@ function GraficaResiduos({ ultimoRegistro }) {
     { name: 'Inorgánicos', value: Number(ultimoRegistro.inorganicos) || 0 },
     { name: 'Otros', value: Number(ultimoRegistro.otros) || 0 },
   ].filter(d => d.value > 0);
-
   const datosGraficoPastel = pieDataRaw.length > 0 ? pieDataRaw : [{ name: 'Sin datos', value: 1 }];
   const coloresPastel = pieDataRaw.length > 0 ? ['#4ade80', '#10b981', '#064e3b'] : ['#cbd5e1'];
-
   return (
     <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '20px', boxShadow: '0 8px 20px rgba(0,0,0,0.05)', border: '1px solid #d1fae5', flex: '1 1 300px' }}>
       <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#15803d', fontSize: '16px', textAlign: 'center' }}>♻️ Distribución de Residuos</h3>
@@ -108,7 +106,6 @@ function App() {
   const [luz, setLuz] = useState({ actual: '' });
   const [agua, setAgua] = useState({ actual: '' });
   const [residuos, setResiduos] = useState({ organicos: '', inorganicos: '', otros: '' });
-
   const [editingRowId, setEditingRowId] = useState(null);
   const [editRowData, setEditRowData] = useState({});
 
@@ -117,10 +114,9 @@ function App() {
   const [chatMessages, setChatMessages] = useState([
     { sender: 'bot', text: '¡Hola! Soy EcoBot 🍃. ¿En qué puedo ayudarte hoy?' }
   ]);
-
+  
   // --- NUEVO ESTADO PARA ALERTAS PROPIAS Y BONITAS ---
   const [alerta, setAlerta] = useState({ mostrar: false, mensaje: '', tipo: 'error' });
-
   const mostrarAlerta = (mensaje, tipo = 'error') => {
     setAlerta({ mostrar: true, mensaje, tipo });
     setTimeout(() => {
@@ -139,19 +135,16 @@ function App() {
       console.error("Error cargando historial:", error);
     }
   };
-
   useEffect(() => {
     if (isLoggedIn && hasCompany) {
       cargarDatos();
     }
   }, [isLoggedIn, hasCompany]);
-
   const handleLogout = () => {
     setIsLoggedIn(false);
     setHasCompany(false);
     setUserRol('user');
   };
-
   const formatearFecha = (fechaRaw) => {
     if (!fechaRaw) return new Date().toLocaleDateString();
     const d = new Date(fechaRaw);
@@ -184,7 +177,6 @@ function App() {
       setChatMessages(prev => [...prev, { sender: 'bot', text: respuestaBot }]);
     }, 700);
   };
-
   const generarReportePDF = () => {
     try {
       const fechaActual = new Date();
@@ -193,7 +185,6 @@ function App() {
 
       let registrosAExportar = registros;
       let subTituloPeriodo = "Historial Completo";
-
       if (tipoReporte === 'actual') {
         registrosAExportar = registros.filter(r => {
           const d = new Date(r.fecha_registro);
@@ -207,22 +198,21 @@ function App() {
       }
 
       const doc = new jsPDF();
-      
       // ESTILO PROFESIONAL DEL PDF
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(22);
-      doc.setTextColor(6, 95, 70); // Verde oscuro corporativo
+      doc.setTextColor(6, 95, 70);
+      // Verde oscuro corporativo
       doc.text("Reporte de Sostenibilidad - EcoTrack", 14, 25);
-      
       // Línea divisoria elegante
       doc.setLineWidth(0.5);
       doc.setDrawColor(16, 185, 129); 
-      doc.line(14, 30, 196, 30); 
-
+      doc.line(14, 30, 196, 30);
       // Información del encabezado
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(75, 85, 99); // Texto gris oscuro para fácil lectura
+      doc.setTextColor(75, 85, 99);
+      // Texto gris oscuro para fácil lectura
       doc.text(`Empresa: ${companyData.nombreComercial || 'EcoTrack Principal'}`, 14, 40);
       doc.text(`Periodo: ${subTituloPeriodo}`, 14, 46);
       doc.text(`Generado por: ${userData.nombre || 'Usuario'} (Rol: ${(userRol || 'user').toUpperCase()})`, 14, 52);
@@ -264,7 +254,6 @@ function App() {
           fillColor: [236, 253, 245] // Verde clarito pastel para intercalar
         }
       };
-
       if (typeof autoTable === 'function') {
         autoTable(doc, opcionesTabla);
       } else if (typeof doc.autoTable === 'function') {
@@ -283,7 +272,6 @@ function App() {
       mostrarAlerta("Error al generar el PDF: " + error.message, 'error');
     }
   };
-
   const cardStyle = { 
     backgroundColor: 'rgba(255, 255, 255, 0.7)', 
     backdropFilter: 'blur(10px)',
@@ -292,7 +280,6 @@ function App() {
     boxShadow: '0 8px 20px rgba(0,0,0,0.05)', 
     border: '1px solid #d1fae5'
   };
-
   // --- DISEÑO DE TARJETA FLOTANTE DE ALERTA ---
   const renderEcoAlerta = () => {
     if (!alerta.mostrar) return null;
@@ -334,6 +321,7 @@ function App() {
         background: 'linear-gradient(180deg, #7dd3fc 0%, #f0f9ff 70%, #ffffff 100%)',
         padding: '40px 20px', boxSizing: 'border-box', position: 'relative' 
       }}>
+      
         {renderEcoAlerta()}
         
         <div style={{ textAlign: 'center', marginBottom: '5px', width: '100%', maxWidth: '700px' }}>
@@ -346,9 +334,11 @@ function App() {
               <h2 style={{ color: '#0369a1', marginBottom: '20px' }}>Recuperar Contraseña</h2>
               <p style={{ fontSize: '14px', color: '#4b5563', marginBottom: '20px' }}>Ingresa tu correo y te enviaremos las instrucciones.</p>
               <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+               
                 <input type="email" placeholder="Correo electrónico" style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
                   value={recoveryEmail} onChange={(e) => setRecoveryEmail(e.target.value)} />
-                <button type="button" onClick={() => {
+                
+                <button type="button" onClick={async () => {
                   const correo = recoveryEmail.trim();
                   if (!correo) {
                     return mostrarAlerta("Por favor ingresa tu correo.", 'error');
@@ -360,8 +350,27 @@ function App() {
                     return mostrarAlerta("Ingresa un correo electrónico válido.", 'error');
                   }
 
-                  mostrarAlerta(`Las instrucciones han sido enviadas a ${correo}`, 'success');
-                  setIsRecovering(false);
+                  // --- AQUÍ EMPIEZA LA MAGIA REAL CONECTADA AL BACKEND ---
+                  try {
+                    const res = await fetch('https://ecotrack-server-v1.onrender.com/api/recuperar-password', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ correo })
+                    });
+                    
+                    const data = await res.json();
+
+                    if (res.ok) {
+                      mostrarAlerta(`Las instrucciones han sido enviadas a ${correo}`, 'success');
+                      setIsRecovering(false);
+                    } else {
+                      mostrarAlerta(data.message || "No se pudo enviar el enlace.", 'error');
+                    }
+                  } catch (error) {
+                    mostrarAlerta("Error conectando con el servidor.", 'error');
+                  }
+                  // --- FIN DE LA MAGIA ---
+
                 }} style={{ padding: '12px', background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
                   ENVIAR ENLACE
                 </button>
@@ -373,6 +382,7 @@ function App() {
           ) : (
             <>
               <h2 style={{ color: '#0369a1', marginBottom: '20px' }}>{isRegistering ? 'Crear Cuenta Personal' : 'EcoTrack Login'}</h2>
+      
               <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 {isRegistering && (
                   <input type="text" placeholder="Tu nombre completo" style={{ padding: '12px', borderRadius: '8px', border: '1px solid #ddd' }} 
@@ -423,7 +433,6 @@ function App() {
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify(formData)
                     });
-                    
                     const data = await res.json();
 
                     if (res.ok) {
@@ -441,7 +450,7 @@ function App() {
                         } else {
                           setUserRol('user');
                         }
-                        setIsLoggedIn(true); 
+                        setIsLoggedIn(true);
                         setUserData({ nombre: data.nombre || 'Usuario' });
                         mostrarAlerta(`¡Bienvenido de nuevo, ${data.nombre || 'Usuario'}!`, 'success');
                       }
@@ -451,7 +460,7 @@ function App() {
                   } catch (error) {
                     mostrarAlerta("Error de comunicación con el servidor.", 'error');
                   } finally {
-                    setIsLoggingIn(false); 
+                    setIsLoggingIn(false);
                   }
                 }} type="button" style={{ padding: '12px', background: isLoggingIn ? '#9ca3af' : '#10b981', color: '#fff', border: 'none', borderRadius: '8px', cursor: isLoggingIn ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
                   {isLoggingIn ? 'Verificando credenciales...' : (isRegistering ? 'REGISTRARME' : 'ENTRAR')}
@@ -557,7 +566,6 @@ function App() {
   }
 
   const ultimoRegistro = registros[0] || {};
-
   return (
     <div style={{ width: '100vw', minHeight: '100vh', backgroundColor: '#ecfdf5', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif' }}>
       {renderEcoAlerta()}
@@ -618,7 +626,6 @@ function App() {
                 }
 
                 const payload = { luz: Number(luz.actual), agua: Number(agua.actual), organicos: Number(residuos.organicos), inorganicos: Number(residuos.inorganicos), otros: Number(residuos.otros) };
-
                 try {
                   const res = await fetch('https://ecotrack-server-v1.onrender.com/api/registros', {
                     method: 'POST',
@@ -627,9 +634,9 @@ function App() {
                   });
                   
                   if (res.ok) { 
-                    mostrarAlerta("¡Datos ecológicos guardados con éxito! 💾", 'success'); 
+                    mostrarAlerta("¡Datos ecológicos guardados con éxito! 💾", 'success');
                     setLuz({actual: ''}); setAgua({actual: ''}); setResiduos({organicos: '', inorganicos: '', otros: ''});
-                    cargarDatos(); 
+                    cargarDatos();
                   } else {
                     mostrarAlerta("Hubo un problema al almacenar el registro.", 'error');
                   }
@@ -651,7 +658,7 @@ function App() {
           <h3 style={{ color: '#065f46', marginTop: 0 }}>📋 Últimos Registros en la Nube (PostgreSQL)</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center' }}>
             <thead>
-              <tr style={{ borderBottom: '2px solid #10b981', color: '#374151' }}>
+               <tr style={{ borderBottom: '2px solid #10b981', color: '#374151' }}>
                 <th style={{ padding: '10px' }}>Fecha</th>
                 <th>Luz (kWh)</th>
                 <th>Agua (m³)</th>
