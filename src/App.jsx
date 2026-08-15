@@ -6,8 +6,9 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// --- DEFINICIÓN DE LOGOS SEGÚN LA VISTA ---
-// Se agregó %20 para evitar que los espacios rompan las imágenes en la nube
+// ==========================================
+// DEFINICIÓN DE LOGOS
+// ==========================================
 const loginLogoUrl = '/Logo-Ecotrack%20(2).png';
 const dashboardHeaderLogoUrl = '/logo-ecotrack.png'; 
 
@@ -115,7 +116,12 @@ function App() {
   const [hasCompany, setHasCompany] = useState(false);
   const [userRol, setUserRol] = useState('user');
   const [userData, setUserData] = useState({ nombre: '' });
-  const [companyData, setCompanyData] = useState({ nombreComercial: '', rfc: '', ciudad: '' });
+  const [companyData, setCompanyData] = useState({ id: null, nombreComercial: '', rfc: '', ciudad: '' });
+  const [empresasDisponibles, setEmpresasDisponibles] = useState([]);
+  const [cargandoEmpresas, setCargandoEmpresas] = useState(false);
+  const [mostrarFormNuevaEmpresa, setMostrarFormNuevaEmpresa] = useState(false);
+  const [nuevaEmpresa, setNuevaEmpresa] = useState({ nombreComercial: '', rfc: '', ciudad: '' });
+  const [creandoEmpresa, setCreandoEmpresa] = useState(false);
   const [formData, setFormData] = useState({ nombre: '', correo: '', password: '' });
   const [registros, setRegistros] = useState([]);
   const [tipoReporte, setTipoReporte] = useState('actual');
@@ -141,8 +147,9 @@ function App() {
   };
 
   const cargarDatos = async () => {
+    if (!companyData.id) return;
     try {
-      const res = await fetch('https://ecotrack-server-v1.onrender.com/api/registros');
+      const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/registros?empresa_id=${companyData.id}`);
       const data = await res.json();
       if (Array.isArray(data)) {
         setRegistros(data);
@@ -152,9 +159,34 @@ function App() {
     }
   };
 
+  const cargarEmpresas = async () => {
+    setCargandoEmpresas(true);
+    try {
+      const res = await fetch('https://ecotrack-server-v1.onrender.com/api/empresas');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setEmpresasDisponibles(data);
+      }
+    } catch (error) {
+      console.error("Error cargando empresas:", error);
+    } finally {
+      setCargandoEmpresas(false);
+    }
+  };
+
   useEffect(() => {
-    if (isLoggedIn && hasCompany) {
+    if (isLoggedIn && hasCompany && companyData.id) {
       cargarDatos();
+      // Los sensores mandan lecturas automáticas cada ~3 minutos, así que el
+      // dashboard se refresca solo cada minuto para mostrarlas sin recargar la página.
+      const intervalo = setInterval(cargarDatos, 60000);
+      return () => clearInterval(intervalo);
+    }
+  }, [isLoggedIn, hasCompany, companyData.id]);
+
+  useEffect(() => {
+    if (isLoggedIn && !hasCompany) {
+      cargarEmpresas();
     }
   }, [isLoggedIn, hasCompany]);
 
@@ -168,6 +200,48 @@ function App() {
     setAgua({ actual: '' });
     setResiduos({ organicos: '', inorganicos: '', otros: '' });
     setFormData({ nombre: '', correo: '', password: '' });
+    setCompanyData({ id: null, nombreComercial: '', rfc: '', ciudad: '' });
+    setMostrarFormNuevaEmpresa(false);
+    setNuevaEmpresa({ nombreComercial: '', rfc: '', ciudad: '' });
+  };
+
+  const handleCambiarEmpresa = () => {
+    setHasCompany(false);
+    setRegistros([]);
+    setEditingRowId(null);
+    setEditRowData({});
+  };
+
+  const handleCrearEmpresa = async () => {
+    const nombreValido = nuevaEmpresa.nombreComercial.trim();
+    if (!nombreValido) {
+      return mostrarAlerta("Ingresa el nombre comercial de la nueva empresa.", 'error');
+    }
+    setCreandoEmpresa(true);
+    try {
+      const res = await fetch('https://ecotrack-server-v1.onrender.com/api/empresas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nombreComercial: nombreValido,
+          rfc: nuevaEmpresa.rfc.trim(),
+          ciudad: nuevaEmpresa.ciudad.trim()
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        mostrarAlerta(`Empresa "${data.empresa.nombre_comercial}" creada correctamente.`, 'success');
+        setEmpresasDisponibles(prev => [...prev, data.empresa]);
+        setNuevaEmpresa({ nombreComercial: '', rfc: '', ciudad: '' });
+        setMostrarFormNuevaEmpresa(false);
+      } else {
+        mostrarAlerta(data.message || "No se pudo crear la empresa.", 'error');
+      }
+    } catch (error) {
+      mostrarAlerta("Error de conexión al crear la empresa.", 'error');
+    } finally {
+      setCreandoEmpresa(false);
+    }
   };
 
   const formatearFecha = (fechaRaw) => {
@@ -193,8 +267,16 @@ function App() {
         respuestaBot = '¡Hola! Bienvenido al soporte de EcoTrack. Estoy aquí para resolver tus dudas sobre el acceso o el uso básico del sistema.';
       } else if (textoGuardado.includes('contraseña') || textoGuardado.includes('password') || textoGuardado.includes('entrar')) {
         respuestaBot = 'Si olvidaste tu contraseña, utiliza el botón "Contactar al Administrador" en la pantalla de inicio de sesión para solicitar el restablecimiento.';
-      } else if (textoGuardado.includes('registro') || textoGuardado.includes('cuenta') || textoGuardado.includes('crear')) {
+      } else if (textoGuardado.includes('registro') || textoGuardado.includes('cuenta') || textoGuardado.includes('crear cuenta')) {
         respuestaBot = 'Puedes crear una cuenta personal haciendo clic en el enlace "¿No tienes cuenta? Regístrate aquí" debajo del botón de Entrar.';
+      } else if (textoGuardado.includes('empresa')) {
+        respuestaBot = 'Al iniciar sesión puedes elegir la empresa con la que quieres trabajar, o crear una nueva con el botón "+ Agregar nueva empresa" en esa misma pantalla.';
+      } else if (textoGuardado.includes('sensor')) {
+        respuestaBot = 'Los sensores de luz y agua envían sus lecturas automáticamente cada pocos minutos y el panel se actualiza solo, sin que tengas que hacer nada.';
+      } else if (textoGuardado.includes('pdf') || textoGuardado.includes('reporte')) {
+        respuestaBot = 'Puedes descargar un reporte en PDF desde el botón "🖨️ Descargar Reporte PDF" en la parte superior del dashboard (solo administradores).';
+      } else if (textoGuardado.includes('gracias')) {
+        respuestaBot = '¡Con gusto! Si te surge otra duda, aquí estaré. 🍃';
       } else if (textoGuardado.includes('qué es') || textoGuardado.includes('ecotrack') || textoGuardado.includes('funciona')) {
         respuestaBot = 'EcoTrack es una plataforma diseñada para auditar y gestionar el impacto ecológico corporativo mediante el monitoreo de consumos y residuos.';
       }
@@ -367,9 +449,7 @@ function App() {
         padding: '20px', boxSizing: 'border-box', position: 'relative', overflowX: 'hidden'
       }}>
         
-        {/* SISTEMA DE ESCANEO DE PANTALLA (MEDIA QUERIES) Y REPARACIÓN DE TEXTOS INVISIBLES */}
         <style>{`
-          /* Previene el texto invisible provocado por el autocompletado del navegador */
           input:-webkit-autofill,
           input:-webkit-autofill:hover, 
           input:-webkit-autofill:focus {
@@ -382,7 +462,6 @@ function App() {
             display: flex; flex-wrap: nowrap; justify-content: center; gap: 40px; margin-top: 60px; color: #1e293b; text-align: center; max-width: 1000px; padding-bottom: 40px;
           }
 
-          /* Responsividad: Transforma filas a columnas cuando detecta celular/tablet */
           @media (max-width: 900px) {
             .beneficios-row { flex-wrap: wrap; gap: 20px; }
             .beneficios-row > div { width: 45% !important; }
@@ -448,7 +527,6 @@ function App() {
                 const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/${url}`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  // VALIDACIÓN: Se envía el payload depurado
                   body: JSON.stringify({
                     nombre: formData.nombre.trim(),
                     correo: correoValido.toLowerCase(),
@@ -462,19 +540,27 @@ function App() {
                     mostrarAlerta("Cuenta creada con éxito. Ya puedes iniciar sesión.", 'success');
                     setIsRegistering(false);
                   } else {
-                    const correoIngresado = correoValido.toLowerCase();
-                    if (
-                      correoIngresado === 'lopezperezdavidantonio8@gmail.com' || 
-                      correoIngresado === 'asistencia.ecotrack@gmail.com' ||
-                      correoIngresado === '230i0030@martineztorre.tecnm.mx' ||
-                      correoIngresado === 'solecitocortes75@gmail.com'
-                    ) {
-                      setUserRol('admin');
-                    } else {
-                      setUserRol('user');
-                    }
+                    // El rol y la empresa ahora vienen directo de tu tabla `usuarios` en Neon,
+                    // ya no de una lista de correos fija en el frontend.
+                    const rolReal = data.rol === 'admin' ? 'admin' : 'user';
+                    setUserRol(rolReal);
                     setIsLoggedIn(true);
                     setUserData({ nombre: data.nombre || 'Usuario' });
+
+                    if (rolReal === 'admin') {
+                      // Los administradores eligen con qué empresa trabajar.
+                      setHasCompany(false);
+                    } else {
+                      // Un usuario normal pertenece a una sola empresa (empresa_id en su cuenta),
+                      // así que entra directo a su dashboard sin pasar por el selector.
+                      setCompanyData({
+                        id: data.empresa_id || 1,
+                        nombreComercial: data.nombre_comercial || 'Empresa',
+                        rfc: data.rfc,
+                        ciudad: data.ciudad
+                      });
+                      setHasCompany(true);
+                    }
                     mostrarAlerta(`Bienvenido, ${data.nombre || 'Usuario'}. Sesión iniciada correctamente.`, 'success');
                   }
                 } else {
@@ -535,7 +621,6 @@ function App() {
           </div>
         </div>
 
-        {/* Chatbot flotante */}
         <div style={{ position: 'fixed', bottom: '30px', right: '30px', zIndex: 1000, fontFamily: 'sans-serif' }}>
           {isChatOpen ? (
             <div style={{ width: '340px', height: '480px', backgroundColor: '#fff', borderRadius: '20px', boxShadow: '0 15px 35px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: `2px solid ${colors.primary}` }}>
@@ -559,7 +644,7 @@ function App() {
               </div>
 
               <div style={{ display: 'flex', gap: '6px', padding: '8px 12px', overflowX: 'auto', backgroundColor: '#f3f4f6', borderTop: '1px solid #e5e7eb' }}>
-                {['Olvidé mi contraseña', '¿Qué es EcoTrack?', 'Crear cuenta'].map(text => (
+                {['Olvidé mi contraseña', '¿Qué es EcoTrack?', '¿Cómo agrego una empresa?', '¿Cómo funcionan los sensores?'].map(text => (
                   <button key={text} onClick={() => gestionarEnvioMensaje(text)} style={{ whiteSpace: 'nowrap', padding: '7px 12px', borderRadius: '20px', border: `2px solid ${colors.primary}`, background: '#fff', color: colors.primary, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}>{text}</button>
                 ))}
               </div>
@@ -590,9 +675,64 @@ function App() {
             Nivel de Acceso Asignado: {userRol.toUpperCase()}
           </div>
           <p style={{color: '#4b5563', fontSize: '15px', lineHeight: '1.6', marginBottom: '30px'}}>Selecciona la entidad o sucursal correspondiente para comenzar a gestionar los datos de consumo.</p>
-          <button onClick={() => { setCompanyData({ nombreComercial: 'EcoTrack Principal' }); setHasCompany(true); }} style={{ padding: '18px', background: colors.primary, color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', width: '100%', fontSize: '18px', boxShadow: '0 5px 10px rgba(0,0,0,0.1)' }}>
-            🏢 Ingresar a EcoTrack Principal
-          </button>
+
+          {cargandoEmpresas ? (
+            <p style={{ color: '#6b7280', fontWeight: 'bold' }}>Cargando empresas...</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+              {empresasDisponibles.length === 0 ? (
+                <p style={{ color: '#6b7280', fontWeight: 'bold', fontSize: '14px' }}>No hay empresas registradas todavía.</p>
+              ) : (
+                empresasDisponibles.map((empresa) => (
+                  <button
+                    key={empresa.id}
+                    onClick={() => {
+                      setCompanyData({
+                        id: empresa.id,
+                        nombreComercial: empresa.nombre_comercial,
+                        rfc: empresa.rfc,
+                        ciudad: empresa.ciudad
+                      });
+                      setHasCompany(true);
+                    }}
+                    style={{ padding: '18px', background: colors.primary, color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', width: '100%', fontSize: '17px', boxShadow: '0 5px 10px rgba(0,0,0,0.1)' }}
+                  >
+                    🏢 Ingresar a {empresa.nombre_comercial}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+
+          {mostrarFormNuevaEmpresa ? (
+            <div style={{ marginTop: '10px', padding: '20px', borderRadius: '16px', backgroundColor: '#f8fafc', border: '2px solid #e2e8f0', textAlign: 'left' }}>
+              <label style={{ fontWeight: 'bold', color: colors.aguaText, fontSize: '13px', marginBottom: '6px', display: 'block' }}>Nombre comercial *</label>
+              <input type="text" placeholder="Ej. Recicladora del Norte" style={{ ...loginInputStyle, marginBottom: '12px' }}
+                value={nuevaEmpresa.nombreComercial}
+                onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, nombreComercial: e.target.value })} />
+
+              <label style={{ fontWeight: 'bold', color: colors.aguaText, fontSize: '13px', marginBottom: '6px', display: 'block' }}>RFC (opcional)</label>
+              <input type="text" placeholder="RFC" style={{ ...loginInputStyle, marginBottom: '12px' }}
+                value={nuevaEmpresa.rfc}
+                onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, rfc: e.target.value })} />
+
+              <label style={{ fontWeight: 'bold', color: colors.aguaText, fontSize: '13px', marginBottom: '6px', display: 'block' }}>Ciudad (opcional)</label>
+              <input type="text" placeholder="Ciudad" style={{ ...loginInputStyle, marginBottom: '18px' }}
+                value={nuevaEmpresa.ciudad}
+                onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, ciudad: e.target.value })} />
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button disabled={creandoEmpresa} onClick={handleCrearEmpresa} style={{ flex: 1, padding: '14px', background: creandoEmpresa ? '#9ca3af' : colors.primary, color: '#fff', border: 'none', borderRadius: '10px', cursor: creandoEmpresa ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
+                  {creandoEmpresa ? 'Creando...' : '✔️ Guardar Empresa'}
+                </button>
+                <button onClick={() => setMostrarFormNuevaEmpresa(false)} style={{ padding: '14px 18px', background: '#9ca3af', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Cancelar</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setMostrarFormNuevaEmpresa(true)} style={{ padding: '16px', background: '#fff', color: colors.primary, border: `3px dashed ${colors.primary}`, borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', width: '100%', fontSize: '15px' }}>
+              ➕ Agregar nueva empresa
+            </button>
+          )}
         </div>
       </div>
     );
@@ -601,11 +741,12 @@ function App() {
   // ==========================================
   // VISTA 3: DASHBOARD PRINCIPAL
   // ==========================================
-  const ultimoRegistro = registros[0] || {};
+  // El registro más reciente puede venir de un sensor (solo trae luz/agua), así que
+  // para la gráfica de residuos se busca el último registro que sí tenga esos datos.
+  const ultimoRegistro = registros.find(r => r.organicos !== null && r.organicos !== undefined) || {};
   return (
     <div style={{ width: '100vw', minHeight: '100vh', backgroundColor: '#f3f4f6', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif', color: '#1f2937', overflowX: 'hidden' }}>
       
-      {/* SISTEMA DE ESCANEO DE PANTALLA PARA EL DASHBOARD */}
       <style>{`
         .header-box { display: flex; justify-content: space-between; align-items: center; padding: 15px 50px; background-color: #fff; border-bottom: 5px solid ${colors.primary}; }
         .data-inputs-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; align-items: flex-end; width: 100%; }
@@ -632,6 +773,7 @@ function App() {
             <div style={{ fontWeight: 'bold', color: '#111827', fontSize: '16px' }}>{userData.nombre}</div>
             <div style={{ fontSize: '13px', color: colors.primary, fontWeight: 'bold' }}>📍 {companyData.nombreComercial} (Panel de Control)</div>
           </div>
+          <button onClick={handleCambiarEmpresa} style={{ background: colors.aguaText, color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', boxShadow: '0 3px 5px rgba(3, 105, 161, 0.3)' }}>🔄 Cambiar Empresa</button>
           <button onClick={handleLogout} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', boxShadow: '0 3px 5px rgba(239, 68, 68, 0.3)' }}>Cerrar Sesión</button>
         </div>
       </header>
@@ -643,7 +785,6 @@ function App() {
             <h2 style={{ color: colors.organicosText, marginTop: 0, fontWeight: 'bold', fontSize: '26px' }}>📊 Dashboard de Gestión Ambiental</h2>
             <p style={{ color: '#4b5563', margin: 0, fontSize: '16px', lineHeight: '1.5' }}>Supervisa y administra el impacto ecológico con estadísticas en tiempo real.</p>
           </div>
-          {/* SEGURIDAD: BOTONES DE REPORTE BLOQUEADOS PARA USUARIO COMÚN */}
           {userRol === 'admin' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '10px' }}>
               <select 
@@ -692,7 +833,6 @@ function App() {
                 const iStr = String(residuos.inorganicos).trim();
                 const otStr = String(residuos.otros).trim();
 
-                // VALIDACIÓN: Blindaje absoluto (Ningún campo vacío, cero o negativo)
                 if (!lStr || !aStr || !oStr || !iStr || !otStr) {
                   return mostrarAlerta("Error: Todos los campos son obligatorios. No dejes ninguno vacío.", 'error');
                 }
@@ -709,7 +849,8 @@ function App() {
                       agua: Number(aStr), 
                       organicos: Number(oStr), 
                       inorganicos: Number(iStr), 
-                      otros: Number(otStr) 
+                      otros: Number(otStr),
+                      empresa_id: companyData.id
                     })
                   });
                   if (res.ok) {
@@ -741,6 +882,7 @@ function App() {
               <thead>
                 <tr style={{ backgroundColor: '#f3f4f6', color: '#1f2937', fontSize: '14px', borderBottom: '3px solid #d1d5db' }}>
                   <th style={{ padding: '15px', fontWeight: 'bold' }}>Fecha</th>
+                  <th style={{ padding: '15px', fontWeight: 'bold' }}>Origen</th>
                   <th style={{ padding: '15px', fontWeight: 'bold', color: colors.luzText }}>Luz (kWh)</th>
                   <th style={{ padding: '15px', fontWeight: 'bold', color: colors.aguaText }}>Agua (m³)</th>
                   <th style={{ padding: '15px', fontWeight: 'bold', color: colors.organicosText }}>Orgánicos (kg)</th>
@@ -751,7 +893,7 @@ function App() {
               </thead>
               <tbody>
                 {registros.length === 0 ? (
-                  <tr><td colSpan={userRol === 'admin' ? 7 : 6} style={{ padding: '30px', color: '#6b7280', fontSize: '16px', fontWeight: 'bold' }}>No hay registros disponibles en la base de datos.</td></tr>
+                  <tr><td colSpan={userRol === 'admin' ? 8 : 7} style={{ padding: '30px', color: '#6b7280', fontSize: '16px', fontWeight: 'bold' }}>No hay registros disponibles en la base de datos.</td></tr>
                 ) : (
                   registros.map((row) => {
                     const isEditing = userRol === 'admin' && editingRowId === row.id;
@@ -760,6 +902,13 @@ function App() {
                     return (
                       <tr key={idRegistro} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: isEditing ? '#f0f9ff' : 'transparent', transition: 'background-color 0.2s' }}>
                         <td style={{ padding: '15px', fontSize: '14px', color: '#4b5563', fontWeight: 'bold' }}>{formatearFecha(row.fecha_registro)}</td>
+                        <td style={{ padding: '15px', fontSize: '13px', fontWeight: 'bold' }}>
+                          {row.origen === 'sensor' ? (
+                            <span style={{ color: colors.aguaText }}>🤖 Sensor</span>
+                          ) : (
+                            <span style={{ color: colors.organicosText }}>✍️ Manual</span>
+                          )}
+                        </td>
                         
                         {[
                           { key: 'luz', value: row.luz, color: colors.luzText, border: colors.luz },
@@ -777,7 +926,9 @@ function App() {
                                 onChange={(e) => setEditRowData({...editRowData, [cell.key]: e.target.value})} 
                               />
                             ) : (
-                              `${cell.value} ${cell.key === 'luz' ? 'kWh' : cell.key === 'agua' ? 'm³' : 'kg'}`
+                              cell.value === null || cell.value === undefined
+                                ? '—'
+                                : `${cell.value} ${cell.key === 'luz' ? 'kWh' : cell.key === 'agua' ? 'm³' : 'kg'}`
                             )}
                           </td>
                         ))}
@@ -793,7 +944,6 @@ function App() {
                                   const eiStr = editRowData.inorganicos !== undefined && editRowData.inorganicos !== null ? String(editRowData.inorganicos).trim() : '';
                                   const eotStr = editRowData.otros !== undefined && editRowData.otros !== null ? String(editRowData.otros).trim() : '';
 
-                                  // VALIDACIÓN ABSOLUTA EN EDICIÓN
                                   if (!elStr || !eaStr || !eoStr || !eiStr || !eotStr) {
                                     return mostrarAlerta("Error: No puedes dejar campos en blanco durante la edición.", 'error');
                                   }
