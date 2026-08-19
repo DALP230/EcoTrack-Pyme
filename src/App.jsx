@@ -125,6 +125,8 @@ function App() {
   const [formData, setFormData] = useState({ nombre: '', correo: '', password: '' });
   const [registros, setRegistros] = useState([]);
   const [tipoReporte, setTipoReporte] = useState('actual');
+  const [simulacionActiva, setSimulacionActiva] = useState(false);
+  const [simulacionInfo, setSimulacionInfo] = useState(null);
 
   const [luz, setLuz] = useState({ actual: '' });
   const [agua, setAgua] = useState({ actual: '' });
@@ -189,6 +191,122 @@ function App() {
       cargarEmpresas();
     }
   }, [isLoggedIn, hasCompany]);
+
+  // ============================================================
+  // SIMULACIÓN DE SENSORES (SOLO PARA DEMOSTRACIÓN)
+  // ============================================================
+  // Genera lecturas de luz y agua "coherentes" (incrementos pequeños, más
+  // actividad en horario laboral) cada 5-10 minutos durante 24 horas, e
+  // inserta cada una con origen: 'simulacion' para que NUNCA se confunda con
+  // una lectura real de sensor físico en el historial ni en las gráficas.
+  // Usa localStorage solo para que la simulación sobreviva a un refresh de
+  // página durante esas 24h (requiere que el navegador siga abierto; si se
+  // cierra la pestaña o la computadora se suspende, los inserts se pausan
+  // hasta que se vuelva a abrir la página).
+  const claveSimulacion = (empresaId) => `ecotrack_sim_${empresaId}`;
+
+  const generarSiguienteValor = (valorAnterior, esLuz) => {
+    const hora = new Date().getHours();
+    const horarioLaboral = hora >= 8 && hora <= 20;
+    const base = esLuz ? (horarioLaboral ? [2, 9] : [0.2, 1.5]) : (horarioLaboral ? [0.05, 0.3] : [0.01, 0.08]);
+    const incremento = base[0] + Math.random() * (base[1] - base[0]);
+    return Number((valorAnterior + incremento).toFixed(2));
+  };
+
+  const insertarLecturaSimulada = async (empresaId, estado) => {
+    const nuevaLuz = generarSiguienteValor(estado.ultimaLuz, true);
+    const nuevaAgua = generarSiguienteValor(estado.ultimaAgua, false);
+    try {
+      await fetch('https://ecotrack-server-v1.onrender.com/api/registros', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          luz: nuevaLuz,
+          agua: nuevaAgua,
+          organicos: null,
+          inorganicos: null,
+          otros: null,
+          empresa_id: empresaId,
+          origen: 'simulacion'
+        })
+      });
+    } catch (error) {
+      console.error('Error insertando lectura simulada:', error);
+    }
+    return { ultimaLuz: nuevaLuz, ultimaAgua: nuevaAgua };
+  };
+
+  const iniciarSimulacion = async () => {
+    if (!companyData.id) return;
+    const ahora = Date.now();
+    const estadoInicial = {
+      empresaId: companyData.id,
+      inicio: ahora,
+      fin: ahora + 24 * 60 * 60 * 1000,
+      proximaLectura: ahora + 10000, // primera lectura a los 10s para que se vea de inmediato
+      ultimaLuz: 0,
+      ultimaAgua: 0
+    };
+    localStorage.setItem(claveSimulacion(companyData.id), JSON.stringify(estadoInicial));
+    setSimulacionActiva(true);
+    setSimulacionInfo(estadoInicial);
+    mostrarAlerta('Simulación iniciada: se generarán lecturas cada 5-10 min durante 24h.', 'success');
+  };
+
+  const detenerSimulacion = () => {
+    if (companyData.id) localStorage.removeItem(claveSimulacion(companyData.id));
+    setSimulacionActiva(false);
+    setSimulacionInfo(null);
+    mostrarAlerta('Simulación detenida.', 'success');
+  };
+
+  // Al entrar al dashboard, revisa si había una simulación en curso guardada en este navegador.
+  useEffect(() => {
+    if (!isLoggedIn || !hasCompany || !companyData.id) return;
+    const guardado = localStorage.getItem(claveSimulacion(companyData.id));
+    if (guardado) {
+      const estado = JSON.parse(guardado);
+      if (Date.now() < estado.fin) {
+        setSimulacionActiva(true);
+        setSimulacionInfo(estado);
+      } else {
+        localStorage.removeItem(claveSimulacion(companyData.id));
+      }
+    }
+  }, [isLoggedIn, hasCompany, companyData.id]);
+
+  // Motor de la simulación: revisa cada 15s si ya toca insertar la siguiente lectura.
+  useEffect(() => {
+    if (!simulacionActiva || !companyData.id) return;
+    const tick = setInterval(async () => {
+      const guardado = localStorage.getItem(claveSimulacion(companyData.id));
+      if (!guardado) { setSimulacionActiva(false); return; }
+      const estado = JSON.parse(guardado);
+
+      if (Date.now() >= estado.fin) {
+        localStorage.removeItem(claveSimulacion(companyData.id));
+        setSimulacionActiva(false);
+        setSimulacionInfo(null);
+        mostrarAlerta('Simulación de 24h finalizada.', 'success');
+        return;
+      }
+
+      if (Date.now() >= estado.proximaLectura) {
+        const { ultimaLuz, ultimaAgua } = await insertarLecturaSimulada(companyData.id, estado);
+        const minutosSiguiente = 5 + Math.random() * 5; // entre 5 y 10 minutos
+        const nuevoEstado = {
+          ...estado,
+          ultimaLuz,
+          ultimaAgua,
+          proximaLectura: Date.now() + minutosSiguiente * 60 * 1000
+        };
+        localStorage.setItem(claveSimulacion(companyData.id), JSON.stringify(nuevoEstado));
+        setSimulacionInfo(nuevoEstado);
+        cargarDatos();
+      }
+    }, 15000);
+    return () => clearInterval(tick);
+  }, [simulacionActiva, companyData.id]);
 
   const handleLogout = () => {
     setIsLoggedIn(false);
@@ -773,6 +891,17 @@ function App() {
             <div style={{ fontWeight: 'bold', color: '#111827', fontSize: '16px' }}>{userData.nombre}</div>
             <div style={{ fontSize: '13px', color: colors.primary, fontWeight: 'bold' }}>📍 {companyData.nombreComercial} (Panel de Control)</div>
           </div>
+          {userRol === 'admin' && (
+            simulacionActiva ? (
+              <button onClick={detenerSimulacion} style={{ background: '#f59e0b', color: '#fff', border: 'none', padding: '12px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 5px rgba(245, 158, 11, 0.3)' }}>
+                🧪 Simulación activa — detener
+              </button>
+            ) : (
+              <button onClick={iniciarSimulacion} style={{ background: '#fff', color: '#f59e0b', border: '2px dashed #f59e0b', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
+                🧪 Iniciar simulación (24h, solo demo)
+              </button>
+            )
+          )}
           <button onClick={handleCambiarEmpresa} style={{ background: colors.aguaText, color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', boxShadow: '0 3px 5px rgba(3, 105, 161, 0.3)' }}>🔄 Cambiar Empresa</button>
           <button onClick={handleLogout} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', boxShadow: '0 3px 5px rgba(239, 68, 68, 0.3)' }}>Cerrar Sesión</button>
         </div>
@@ -905,6 +1034,8 @@ function App() {
                         <td style={{ padding: '15px', fontSize: '13px', fontWeight: 'bold' }}>
                           {row.origen === 'sensor' ? (
                             <span style={{ color: colors.aguaText }}>🤖 Sensor</span>
+                          ) : row.origen === 'simulacion' ? (
+                            <span style={{ color: '#f59e0b' }}>🧪 Simulación</span>
                           ) : (
                             <span style={{ color: colors.organicosText }}>✍️ Manual</span>
                           )}
