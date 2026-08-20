@@ -394,7 +394,7 @@ function App() {
       } else if (textoGuardado.includes('sensor')) {
         respuestaBot = 'Los sensores de luz y agua envían sus lecturas automáticamente cada pocos minutos y el panel se actualiza solo, sin que tengas que hacer nada.';
       } else if (textoGuardado.includes('pdf') || textoGuardado.includes('reporte')) {
-        respuestaBot = 'Puedes descargar un reporte en PDF desde el botón "🖨️ Descargar Reporte PDF" en la parte superior del dashboard (solo administradores).';
+        respuestaBot = 'Puedes descargar un reporte en PDF desde el botón "🖨️ Descargar Reporte PDF" en la parte superior del dashboard.';
       } else if (textoGuardado.includes('gracias')) {
         respuestaBot = '¡Con gusto! Si te surge otra duda, aquí estaré. 🍃';
       } else if (textoGuardado.includes('qué es') || textoGuardado.includes('ecotrack') || textoGuardado.includes('funciona')) {
@@ -900,7 +900,7 @@ function App() {
               </button>
             ) : (
               <button onClick={iniciarSimulacion} style={{ background: '#fff', color: '#f59e0b', border: '2px dashed #f59e0b', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
-                🧪 Iniciar simulación (24h, solo demo)
+                🧪 Iniciar simulación (4h, solo demo)
               </button>
             )
           )}
