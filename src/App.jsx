@@ -196,11 +196,11 @@ function App() {
   // SIMULACIÓN DE SENSORES (SOLO PARA DEMOSTRACIÓN)
   // ============================================================
   // Genera lecturas de luz y agua "coherentes" (incrementos pequeños, más
-  // actividad en horario laboral) cada 5-10 minutos durante 24 horas, e
+  // actividad en horario laboral) cada ~2 minutos durante 4 horas, e
   // inserta cada una con origen: 'simulacion' para que NUNCA se confunda con
   // una lectura real de sensor físico en el historial ni en las gráficas.
   // Usa localStorage solo para que la simulación sobreviva a un refresh de
-  // página durante esas 24h (requiere que el navegador siga abierto; si se
+  // página durante esas 4h (requiere que el navegador siga abierto; si se
   // cierra la pestaña o la computadora se suspende, los inserts se pausan
   // hasta que se vuelva a abrir la página).
   const claveSimulacion = (empresaId) => `ecotrack_sim_${empresaId}`;
@@ -208,9 +208,11 @@ function App() {
   const generarSiguienteValor = (valorAnterior, esLuz) => {
     const hora = new Date().getHours();
     const horarioLaboral = hora >= 8 && hora <= 20;
-    const base = esLuz ? (horarioLaboral ? [2, 9] : [0.2, 1.5]) : (horarioLaboral ? [0.05, 0.3] : [0.01, 0.08]);
+    // Incrementos moderados por intervalo de 2 minutos, para que en 4 horas
+    // (unas 120 lecturas) la curva suba de forma creíble sin dispararse.
+    const base = esLuz ? (horarioLaboral ? [0.3, 1.2] : [0.05, 0.25]) : (horarioLaboral ? [0.004, 0.015] : [0.001, 0.004]);
     const incremento = base[0] + Math.random() * (base[1] - base[0]);
-    return Number((valorAnterior + incremento).toFixed(2));
+    return Number((valorAnterior + incremento).toFixed(3));
   };
 
   const insertarLecturaSimulada = async (empresaId, estado) => {
@@ -242,7 +244,7 @@ function App() {
     const estadoInicial = {
       empresaId: companyData.id,
       inicio: ahora,
-      fin: ahora + 24 * 60 * 60 * 1000,
+      fin: ahora + 4 * 60 * 60 * 1000,
       proximaLectura: ahora + 10000, // primera lectura a los 10s para que se vea de inmediato
       ultimaLuz: 0,
       ultimaAgua: 0
@@ -250,7 +252,7 @@ function App() {
     localStorage.setItem(claveSimulacion(companyData.id), JSON.stringify(estadoInicial));
     setSimulacionActiva(true);
     setSimulacionInfo(estadoInicial);
-    mostrarAlerta('Simulación iniciada: se generarán lecturas cada 5-10 min durante 24h.', 'success');
+    mostrarAlerta('Simulación iniciada: se generarán lecturas cada ~2 min durante 4 horas.', 'success');
   };
 
   const detenerSimulacion = () => {
@@ -287,13 +289,13 @@ function App() {
         localStorage.removeItem(claveSimulacion(companyData.id));
         setSimulacionActiva(false);
         setSimulacionInfo(null);
-        mostrarAlerta('Simulación de 24h finalizada.', 'success');
+        mostrarAlerta('Simulación de 4 horas finalizada.', 'success');
         return;
       }
 
       if (Date.now() >= estado.proximaLectura) {
         const { ultimaLuz, ultimaAgua } = await insertarLecturaSimulada(companyData.id, estado);
-        const minutosSiguiente = 5 + Math.random() * 5; // entre 5 y 10 minutos
+        const minutosSiguiente = 1.75 + Math.random() * 0.5; // ~2 minutos, con ligera variación natural
         const nuevoEstado = {
           ...estado,
           ultimaLuz,
@@ -914,8 +916,7 @@ function App() {
             <h2 style={{ color: colors.organicosText, marginTop: 0, fontWeight: 'bold', fontSize: '26px' }}>📊 Dashboard de Gestión Ambiental</h2>
             <p style={{ color: '#4b5563', margin: 0, fontSize: '16px', lineHeight: '1.5' }}>Supervisa y administra el impacto ecológico con estadísticas en tiempo real.</p>
           </div>
-          {userRol === 'admin' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '10px' }}>
               <select 
                 value={tipoReporte} 
                 onChange={(e) => setTipoReporte(e.target.value)} 
@@ -928,7 +929,6 @@ function App() {
                 🖨️ Descargar Reporte PDF
               </button>
             </div>
-          )}
         </div>
 
         <div style={{ ...cardStyle, marginBottom: '35px', backgroundColor: '#fff', border: '1px solid #e5e7eb' }}>
