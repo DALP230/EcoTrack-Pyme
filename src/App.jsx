@@ -1,40 +1,33 @@
 import { useState, useEffect } from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
-  LineChart, Line, CartesianGrid, Legend, PieChart, Pie, Cell 
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  LineChart, Line, CartesianGrid, Legend, PieChart, Pie, Cell
 } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-// ==========================================
-// DEFINICIÓN DE LOGOS
-// ==========================================
+ 
 const loginLogoUrl = '/Logo-Ecotrack%20(2).png';
-const dashboardHeaderLogoUrl = '/logo-ecotrack.png'; 
-
-// ==========================================
-// PALETA DE COLORES
-// ==========================================
+const dashboardHeaderLogoUrl = '/logo-ecotrack.png';
+ 
 const colors = {
-  luz: '#f59e0b',       
+  luz: '#f59e0b',
   luzText: '#b45309',
-  agua: '#0ea5e9',      
+  agua: '#0ea5e9',
   aguaText: '#0369a1',
-  organicos: '#10b981', 
+  organicos: '#10b981',
   organicosText: '#15803d',
   inorganicos: '#14b8a6',
   inorganicosText: '#0f766e',
-  otros: '#f97316',     
+  otros: '#f97316',
   otrosText: '#b91c1c',
-  primary: '#16a34a',   
-  loginInputBg: '#f0f9ff', 
-  loginInputBlue: '#0369a1' 
+  primary: '#16a34a',
+  loginInputBg: '#f0f9ff',
+  loginInputBlue: '#0369a1'
 };
-
+ 
 // ==========================================
-// COMPONENTES DE GRÁFICAS
+// GRÁFICAS
 // ==========================================
-
 function GraficaLuz({ datos }) {
   const datosCronologicos = [...datos].reverse();
   return (
@@ -44,10 +37,10 @@ function GraficaLuz({ datos }) {
         <ResponsiveContainer>
           <BarChart data={datosCronologicos}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="fecha_registro" tickFormatter={(t) => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString(undefined, {month:'short', day:'numeric'}); }} style={{ fontSize: '12px', fontWeight: 'bold', fill: '#374151' }} />
+            <XAxis dataKey="fecha_registro" tickFormatter={(t) => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }} style={{ fontSize: '12px', fontWeight: 'bold', fill: '#374151' }} />
             <YAxis style={{ fontSize: '12px', fontWeight: 'bold', fill: '#374151' }} />
-            <Tooltip contentStyle={{fontWeight: 'bold', borderRadius: '8px'}}/>
-            <Legend wrapperStyle={{fontWeight: 'bold'}}/>
+            <Tooltip contentStyle={{ fontWeight: 'bold', borderRadius: '8px' }} />
+            <Legend wrapperStyle={{ fontWeight: 'bold' }} />
             <Bar dataKey="luz" name="Luz (kWh)" fill={colors.luz} radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -55,7 +48,7 @@ function GraficaLuz({ datos }) {
     </div>
   );
 }
-
+ 
 function GraficaAgua({ datos }) {
   const datosCronologicos = [...datos].reverse();
   return (
@@ -65,18 +58,18 @@ function GraficaAgua({ datos }) {
         <ResponsiveContainer>
           <LineChart data={datosCronologicos}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="fecha_registro" tickFormatter={(t) => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString(undefined, {month:'short', day:'numeric'}); }} style={{ fontSize: '12px', fontWeight: 'bold', fill: '#374151' }} />
+            <XAxis dataKey="fecha_registro" tickFormatter={(t) => { const d = new Date(t); return isNaN(d) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }} style={{ fontSize: '12px', fontWeight: 'bold', fill: '#374151' }} />
             <YAxis style={{ fontSize: '12px', fontWeight: 'bold', fill: '#374151' }} />
-            <Tooltip contentStyle={{fontWeight: 'bold', borderRadius: '8px'}}/>
-            <Legend wrapperStyle={{fontWeight: 'bold'}}/>
-            <Line type="monotone" dataKey="agua" name="Agua (m³)" stroke={colors.agua} strokeWidth={4} activeDot={{ r: 10, strokeWidth: 2, stroke: '#fff' }} dot={{strokeWidth: 3}} />
+            <Tooltip contentStyle={{ fontWeight: 'bold', borderRadius: '8px' }} />
+            <Legend wrapperStyle={{ fontWeight: 'bold' }} />
+            <Line type="monotone" dataKey="agua" name="Agua (m³)" stroke={colors.agua} strokeWidth={4} activeDot={{ r: 10, strokeWidth: 2, stroke: '#fff' }} dot={{ strokeWidth: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
     </div>
   );
 }
-
+ 
 function GraficaResiduos({ ultimoRegistro }) {
   const pieDataRaw = [
     { name: 'Orgánicos', value: Number(ultimoRegistro.organicos) || 0 },
@@ -93,26 +86,45 @@ function GraficaResiduos({ ultimoRegistro }) {
           <PieChart>
             <Pie data={datosGraficoPastel} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" stroke="none">
               {datosGraficoPastel.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={coloresPastel[index % coloresPastel.length]} style={{outline: 'none'}}/>
+                <Cell key={`cell-${index}`} fill={coloresPastel[index % coloresPastel.length]} style={{ outline: 'none' }} />
               ))}
             </Pie>
-            <Tooltip contentStyle={{fontWeight: 'bold', borderRadius: '8px'}} formatter={(value) => pieDataRaw.length > 0 ? `${value} kg` : '0 kg'} />
-            <Legend wrapperStyle={{fontWeight: 'bold'}}/>
+            <Tooltip contentStyle={{ fontWeight: 'bold', borderRadius: '8px' }} formatter={(value) => pieDataRaw.length > 0 ? `${value} kg` : '0 kg'} />
+            <Legend wrapperStyle={{ fontWeight: 'bold' }} />
           </PieChart>
         </ResponsiveContainer>
       </div>
     </div>
   );
 }
-
+ 
 // ==========================================
-// COMPONENTE PRINCIPAL (APP)
+// SIMULACIÓN DE SENSORES (empresa pequeña, sin control visible)
+// ==========================================
+const claveSimulacion = (empresaId) => `ecotrack_sim_${empresaId}`;
+const obtenerFechaHoy = () => new Date().toISOString().slice(0, 10);
+ 
+const nuevoObjetivoDiario = () => ({
+  luz: 18 + Math.random() * 37,   // 18–55 kWh/día, escala de empresa pequeña
+  agua: 0.3 + Math.random() * 1.3 // 0.3–1.6 m³/día
+});
+ 
+const avanzarHaciaObjetivo = (valorActual, objetivo, hora) => {
+  const horarioLaboral = hora >= 7 && hora <= 21;
+  if (!horarioLaboral) return valorActual;
+  const restante = Math.max(objetivo - valorActual, 0);
+  const paso = restante * (0.03 + Math.random() * 0.05);
+  return Number((valorActual + paso).toFixed(3));
+};
+ 
+// ==========================================
+// APP
 // ==========================================
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false); 
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [isLoggingIn, setIsLoggingIn] = useState(false); 
-  
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+ 
   const [hasCompany, setHasCompany] = useState(false);
   const [userRol, setUserRol] = useState('user');
   const [userData, setUserData] = useState({ nombre: '' });
@@ -125,191 +137,103 @@ function App() {
   const [formData, setFormData] = useState({ nombre: '', correo: '', password: '' });
   const [registros, setRegistros] = useState([]);
   const [tipoReporte, setTipoReporte] = useState('actual');
-  const [simulacionActiva, setSimulacionActiva] = useState(false);
-  const [simulacionInfo, setSimulacionInfo] = useState(null);
-
+ 
   const [luz, setLuz] = useState({ actual: '' });
   const [agua, setAgua] = useState({ actual: '' });
   const [residuos, setResiduos] = useState({ organicos: '', inorganicos: '', otros: '' });
   const [editingRowId, setEditingRowId] = useState(null);
   const [editRowData, setEditRowData] = useState({});
-
+ 
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState([
     { sender: 'bot', text: '¡Hola! Soy el Asistente Virtual de EcoTrack. ¿En qué te puedo ayudar hoy?' }
   ]);
   const [alerta, setAlerta] = useState({ mostrar: false, mensaje: '', tipo: 'error' });
-
+ 
   const mostrarAlerta = (mensaje, tipo = 'error') => {
     setAlerta({ mostrar: true, mensaje, tipo });
     setTimeout(() => {
       setAlerta(prev => prev.mensaje === mensaje ? { ...prev, mostrar: false } : prev);
     }, 4500);
   };
-
+ 
   const cargarDatos = async () => {
     if (!companyData.id) return;
     try {
       const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/registros?empresa_id=${companyData.id}`);
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setRegistros(data);
-      }
+      if (Array.isArray(data)) setRegistros(data);
     } catch (error) {
       console.error("Error cargando historial:", error);
     }
   };
-
+ 
   const cargarEmpresas = async () => {
     setCargandoEmpresas(true);
     try {
       const res = await fetch('https://ecotrack-server-v1.onrender.com/api/empresas');
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setEmpresasDisponibles(data);
-      }
+      if (Array.isArray(data)) setEmpresasDisponibles(data);
     } catch (error) {
       console.error("Error cargando empresas:", error);
     } finally {
       setCargandoEmpresas(false);
     }
   };
-
+ 
   useEffect(() => {
     if (isLoggedIn && hasCompany && companyData.id) {
       cargarDatos();
-      // Los sensores mandan lecturas automáticas cada ~3 minutos, así que el
-      // dashboard se refresca solo cada minuto para mostrarlas sin recargar la página.
       const intervalo = setInterval(cargarDatos, 60000);
       return () => clearInterval(intervalo);
     }
   }, [isLoggedIn, hasCompany, companyData.id]);
-
+ 
   useEffect(() => {
-    if (isLoggedIn && !hasCompany) {
-      cargarEmpresas();
-    }
+    if (isLoggedIn && !hasCompany) cargarEmpresas();
   }, [isLoggedIn, hasCompany]);
-
-  // ============================================================
-  // SIMULACIÓN DE SENSORES (SOLO PARA DEMOSTRACIÓN)
-  // ============================================================
-  // Genera lecturas de luz y agua "coherentes" (incrementos pequeños, más
-  // actividad en horario laboral) cada ~2 minutos durante 4 horas, e
-  // inserta cada una con origen: 'simulacion' para que NUNCA se confunda con
-  // una lectura real de sensor físico en el historial ni en las gráficas.
-  // Usa localStorage solo para que la simulación sobreviva a un refresh de
-  // página durante esas 4h (requiere que el navegador siga abierto; si se
-  // cierra la pestaña o la computadora se suspende, los inserts se pausan
-  // hasta que se vuelva a abrir la página).
-  const claveSimulacion = (empresaId) => `ecotrack_sim_${empresaId}`;
-
-  const generarSiguienteValor = (valorAnterior, esLuz) => {
-    const hora = new Date().getHours();
-    const horarioLaboral = hora >= 8 && hora <= 20;
-    // Incrementos moderados por intervalo de 2 minutos, para que en 4 horas
-    // (unas 120 lecturas) la curva suba de forma creíble sin dispararse.
-    const base = esLuz ? (horarioLaboral ? [0.3, 1.2] : [0.05, 0.25]) : (horarioLaboral ? [0.004, 0.015] : [0.001, 0.004]);
-    const incremento = base[0] + Math.random() * (base[1] - base[0]);
-    return Number((valorAnterior + incremento).toFixed(3));
-  };
-
-  const insertarLecturaSimulada = async (empresaId, estado) => {
-    const nuevaLuz = generarSiguienteValor(estado.ultimaLuz, true);
-    const nuevaAgua = generarSiguienteValor(estado.ultimaAgua, false);
-    try {
-      await fetch('https://ecotrack-server-v1.onrender.com/api/registros', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          luz: nuevaLuz,
-          agua: nuevaAgua,
-          organicos: null,
-          inorganicos: null,
-          otros: null,
-          empresa_id: empresaId,
-          origen: 'simulacion'
-        })
-      });
-    } catch (error) {
-      console.error('Error insertando lectura simulada:', error);
-    }
-    return { ultimaLuz: nuevaLuz, ultimaAgua: nuevaAgua };
-  };
-
-  const iniciarSimulacion = async () => {
-    if (!companyData.id) return;
-    const ahora = Date.now();
-    const estadoInicial = {
-      empresaId: companyData.id,
-      inicio: ahora,
-      fin: ahora + 4 * 60 * 60 * 1000,
-      proximaLectura: ahora + 10000, // primera lectura a los 10s para que se vea de inmediato
-      ultimaLuz: 0,
-      ultimaAgua: 0
-    };
-    localStorage.setItem(claveSimulacion(companyData.id), JSON.stringify(estadoInicial));
-    setSimulacionActiva(true);
-    setSimulacionInfo(estadoInicial);
-    mostrarAlerta('Simulación iniciada: se generarán lecturas cada ~2 min durante 4 horas.', 'success');
-  };
-
-  const detenerSimulacion = () => {
-    if (companyData.id) localStorage.removeItem(claveSimulacion(companyData.id));
-    setSimulacionActiva(false);
-    setSimulacionInfo(null);
-    mostrarAlerta('Simulación detenida.', 'success');
-  };
-
-  // Al entrar al dashboard, revisa si había una simulación en curso guardada en este navegador.
+ 
+  // Simulación continua, sin botón: arranca sola al entrar al dashboard y
+  // actualiza el mismo registro del día en vez de crear uno nuevo cada vez.
   useEffect(() => {
     if (!isLoggedIn || !hasCompany || !companyData.id) return;
-    const guardado = localStorage.getItem(claveSimulacion(companyData.id));
-    if (guardado) {
-      const estado = JSON.parse(guardado);
-      if (Date.now() < estado.fin) {
-        setSimulacionActiva(true);
-        setSimulacionInfo(estado);
-      } else {
-        localStorage.removeItem(claveSimulacion(companyData.id));
-      }
-    }
-  }, [isLoggedIn, hasCompany, companyData.id]);
-
-  // Motor de la simulación: revisa cada 15s si ya toca insertar la siguiente lectura.
-  useEffect(() => {
-    if (!simulacionActiva || !companyData.id) return;
-    const tick = setInterval(async () => {
+ 
+    const leerOCrearEstado = () => {
+      const hoy = obtenerFechaHoy();
       const guardado = localStorage.getItem(claveSimulacion(companyData.id));
-      if (!guardado) { setSimulacionActiva(false); return; }
-      const estado = JSON.parse(guardado);
-
-      if (Date.now() >= estado.fin) {
-        localStorage.removeItem(claveSimulacion(companyData.id));
-        setSimulacionActiva(false);
-        setSimulacionInfo(null);
-        mostrarAlerta('Simulación de 4 horas finalizada.', 'success');
-        return;
+      let estado = guardado ? JSON.parse(guardado) : null;
+      if (!estado || estado.fecha !== hoy) {
+        estado = { fecha: hoy, luz: 0, agua: 0, objetivo: nuevoObjetivoDiario() };
+        localStorage.setItem(claveSimulacion(companyData.id), JSON.stringify(estado));
       }
-
-      if (Date.now() >= estado.proximaLectura) {
-        const { ultimaLuz, ultimaAgua } = await insertarLecturaSimulada(companyData.id, estado);
-        const minutosSiguiente = 1.75 + Math.random() * 0.5; // ~2 minutos, con ligera variación natural
-        const nuevoEstado = {
-          ...estado,
-          ultimaLuz,
-          ultimaAgua,
-          proximaLectura: Date.now() + minutosSiguiente * 60 * 1000
-        };
-        localStorage.setItem(claveSimulacion(companyData.id), JSON.stringify(nuevoEstado));
-        setSimulacionInfo(nuevoEstado);
+      return estado;
+    };
+ 
+    leerOCrearEstado();
+ 
+    const tick = setInterval(async () => {
+      const estado = leerOCrearEstado();
+      const hora = new Date().getHours();
+      const nuevaLuz = avanzarHaciaObjetivo(estado.luz, estado.objetivo.luz, hora);
+      const nuevaAgua = avanzarHaciaObjetivo(estado.agua, estado.objetivo.agua, hora);
+      localStorage.setItem(claveSimulacion(companyData.id), JSON.stringify({ ...estado, luz: nuevaLuz, agua: nuevaAgua }));
+ 
+      try {
+        await fetch('https://ecotrack-server-v1.onrender.com/api/registros', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ luz: nuevaLuz, agua: nuevaAgua, empresa_id: companyData.id, origen: 'simulacion' })
+        });
         cargarDatos();
+      } catch (error) {
+        console.error('Error de simulación:', error);
       }
-    }, 15000);
+    }, 90000);
+ 
     return () => clearInterval(tick);
-  }, [simulacionActiva, companyData.id]);
-
+  }, [isLoggedIn, hasCompany, companyData.id]);
+ 
   const handleLogout = () => {
     setIsLoggedIn(false);
     setHasCompany(false);
@@ -324,19 +248,17 @@ function App() {
     setMostrarFormNuevaEmpresa(false);
     setNuevaEmpresa({ nombreComercial: '', rfc: '', ciudad: '' });
   };
-
+ 
   const handleCambiarEmpresa = () => {
     setHasCompany(false);
     setRegistros([]);
     setEditingRowId(null);
     setEditRowData({});
   };
-
+ 
   const handleCrearEmpresa = async () => {
     const nombreValido = nuevaEmpresa.nombreComercial.trim();
-    if (!nombreValido) {
-      return mostrarAlerta("Ingresa el nombre comercial de la nueva empresa.", 'error');
-    }
+    if (!nombreValido) return mostrarAlerta("Ingresa el nombre comercial de la nueva empresa.", 'error');
     setCreandoEmpresa(true);
     try {
       const res = await fetch('https://ecotrack-server-v1.onrender.com/api/empresas', {
@@ -363,26 +285,24 @@ function App() {
       setCreandoEmpresa(false);
     }
   };
-
+ 
   const formatearFecha = (fechaRaw) => {
     if (!fechaRaw) return new Date().toLocaleDateString();
     const d = new Date(fechaRaw);
     return isNaN(d.getTime()) ? new Date().toLocaleDateString() : d.toLocaleDateString();
   };
-
+ 
   const gestionarEnvioMensaje = (textoDirecto = null) => {
     const textoAEnviar = textoDirecto || chatInput;
     if (!textoAEnviar.trim()) return;
-
-    const nuevoMensajeUsuario = { sender: 'user', text: textoAEnviar };
-    setChatMessages(prev => [...prev, nuevoMensajeUsuario]);
+ 
+    setChatMessages(prev => [...prev, { sender: 'user', text: textoAEnviar }]);
     const textoGuardado = textoAEnviar.toLowerCase();
-    
     if (!textoDirecto) setChatInput('');
-
+ 
     setTimeout(() => {
       let respuestaBot = 'Si presentas problemas técnicos avanzados, por favor escribe a asistencia.ecotrack@gmail.com 📧';
-
+ 
       if (textoGuardado.includes('hola') || textoGuardado.includes('buenos') || textoGuardado.includes('buenas')) {
         respuestaBot = '¡Hola! Bienvenido al soporte de EcoTrack. Estoy aquí para resolver tus dudas sobre el acceso o el uso básico del sistema.';
       } else if (textoGuardado.includes('contraseña') || textoGuardado.includes('password') || textoGuardado.includes('entrar')) {
@@ -392,7 +312,7 @@ function App() {
       } else if (textoGuardado.includes('empresa')) {
         respuestaBot = 'Al iniciar sesión puedes elegir la empresa con la que quieres trabajar, o crear una nueva con el botón "+ Agregar nueva empresa" en esa misma pantalla.';
       } else if (textoGuardado.includes('sensor')) {
-        respuestaBot = 'Los sensores de luz y agua envían sus lecturas automáticamente cada pocos minutos y el panel se actualiza solo, sin que tengas que hacer nada.';
+        respuestaBot = 'Los sensores de luz y agua envían sus lecturas automáticamente y el panel se actualiza solo, sin que tengas que hacer nada.';
       } else if (textoGuardado.includes('pdf') || textoGuardado.includes('reporte')) {
         respuestaBot = 'Puedes descargar un reporte en PDF desde el botón "🖨️ Descargar Reporte PDF" en la parte superior del dashboard.';
       } else if (textoGuardado.includes('gracias')) {
@@ -400,17 +320,17 @@ function App() {
       } else if (textoGuardado.includes('qué es') || textoGuardado.includes('ecotrack') || textoGuardado.includes('funciona')) {
         respuestaBot = 'EcoTrack es una plataforma diseñada para auditar y gestionar el impacto ecológico corporativo mediante el monitoreo de consumos y residuos.';
       }
-
+ 
       setChatMessages(prev => [...prev, { sender: 'bot', text: respuestaBot }]);
     }, 800);
   };
-
+ 
   const generarReportePDF = () => {
     try {
       const fechaActual = new Date();
       const mesActual = fechaActual.getMonth();
       const anoActual = fechaActual.getFullYear();
-
+ 
       let registrosAExportar = registros;
       let subTituloPeriodo = "Historial Completo";
       if (tipoReporte === 'actual') {
@@ -420,21 +340,21 @@ function App() {
         });
         subTituloPeriodo = `Mes Actual (${fechaActual.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })})`;
       }
-
+ 
       if (registrosAExportar.length === 0) {
         return mostrarAlerta("No hay registros almacenados en el periodo seleccionado para exportar.", 'error');
       }
-
+ 
       const doc = new jsPDF();
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(22);
       doc.setTextColor(colors.organicosText);
       doc.text("Reporte de Sostenibilidad - EcoTrack", 14, 25);
-      
+ 
       doc.setLineWidth(1);
-      doc.setDrawColor(colors.primary); 
+      doc.setDrawColor(colors.primary);
       doc.line(14, 30, 196, 30);
-      
+ 
       doc.setFontSize(12);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(55, 65, 81);
@@ -442,45 +362,28 @@ function App() {
       doc.text(`Periodo: ${subTituloPeriodo}`, 14, 47);
       doc.text(`Generado por: ${userData.nombre || 'Usuario'} (Rol: ${(userRol || 'user').toUpperCase()})`, 14, 54);
       doc.text(`Fecha de emisión: ${fechaActual.toLocaleDateString()}`, 14, 61);
-
+ 
       const tableColumn = ["Fecha", "Luz (kWh)", "Agua (m³)", "Residuos Totales (kg)"];
-      const tableRows = [];
-
-      registrosAExportar.forEach(r => {
+      const tableRows = registrosAExportar.map(r => {
         const totalResiduos = Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0);
-        const rowData = [
+        return [
           formatearFecha(r.fecha_registro),
           { content: `${r.luz} kWh`, styles: { textColor: colors.luzText, fontStyle: 'bold' } },
           { content: `${r.agua} m³`, styles: { textColor: colors.aguaText, fontStyle: 'bold' } },
           { content: `${totalResiduos} kg`, styles: { textColor: colors.organicosText, fontStyle: 'bold' } }
         ];
-        tableRows.push(rowData);
       });
-
+ 
       const opcionesTabla = {
         head: [tableColumn],
         body: tableRows,
         startY: 68,
         theme: 'grid',
-        styles: { 
-          fontSize: 11, 
-          cellPadding: 5, 
-          textColor: [31, 41, 55],
-          font: 'helvetica',
-          halign: 'center',
-          lineColor: [209, 213, 219] 
-        },
-        headStyles: { 
-          fillColor: colors.primary, 
-          textColor: [255, 255, 255], 
-          fontStyle: 'bold',
-          fontSize: 12
-        },
-        alternateRowStyles: { 
-          fillColor: '#f9fafb' 
-        }
+        styles: { fontSize: 11, cellPadding: 5, textColor: [31, 41, 55], font: 'helvetica', halign: 'center', lineColor: [209, 213, 219] },
+        headStyles: { fillColor: colors.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12 },
+        alternateRowStyles: { fillColor: '#f9fafb' }
       };
-
+ 
       if (typeof autoTable === 'function') {
         autoTable(doc, opcionesTabla);
       } else if (typeof doc.autoTable === 'function') {
@@ -488,49 +391,36 @@ function App() {
       } else {
         throw new Error("No se pudo vincular el generador de tablas jsPDF.");
       }
-
-      const nombreArchivo = tipoReporte === 'actual' 
+ 
+      const nombreArchivo = tipoReporte === 'actual'
         ? `Reporte_EcoTrack_${mesActual + 1}_${anoActual}.pdf`
         : `Reporte_EcoTrack_Historial.pdf`;
-
+ 
       doc.save(nombreArchivo);
     } catch (error) {
-      console.error("Error completo del PDF:", error);
       mostrarAlerta("Error al generar el PDF: " + error.message, 'error');
     }
   };
-
-  const cardStyle = { 
-    backgroundColor: 'rgba(255, 255, 255, 0.85)', 
+ 
+  const cardStyle = {
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
     backdropFilter: 'blur(12px)',
-    padding: '25px', 
-    borderRadius: '25px', 
-    boxShadow: '0 10px 25px rgba(0,0,0,0.06)', 
+    padding: '25px',
+    borderRadius: '25px',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.06)',
     border: '1px solid #e5e7eb'
   };
-
+ 
   const renderEcoAlerta = () => {
     if (!alerta.mostrar) return null;
     return (
       <div style={{
-        position: 'fixed',
-        top: '25px',
-        right: '25px',
-        zIndex: 9999,
-        padding: '18px 26px',
-        borderRadius: '16px',
+        position: 'fixed', top: '25px', right: '25px', zIndex: 9999, padding: '18px 26px', borderRadius: '16px',
         backgroundColor: alerta.tipo === 'success' ? '#def7ec' : '#fde8e8',
         color: alerta.tipo === 'success' ? '#03543f' : '#9b1c1c',
-        border: `3px solid ${alerta.tipo === 'success' ? colors.organicos : '#f8b4b4'}`, 
-        boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '14px',
-        fontWeight: 'bold',
-        fontSize: '15px',
-        maxWidth: '400px',
-        fontFamily: 'sans-serif',
-        animation: 'slideInRight 0.5s ease-out'
+        border: `3px solid ${alerta.tipo === 'success' ? colors.organicos : '#f8b4b4'}`,
+        boxShadow: '0 12px 30px rgba(0,0,0,0.15)', display: 'flex', alignItems: 'center', gap: '14px',
+        fontWeight: 'bold', fontSize: '15px', maxWidth: '400px', fontFamily: 'sans-serif', animation: 'slideInRight 0.5s ease-out'
       }}>
         <span style={{ fontSize: '20px' }}>{alerta.tipo === 'success' ? '✅ ÉXITO:' : '⚠️ ERROR:'}</span>
         <div style={{ flex: 1, textAlign: 'left', lineHeight: '1.4' }}>{alerta.mensaje}</div>
@@ -538,50 +428,37 @@ function App() {
       </div>
     );
   };
-
+ 
   const baseInputStyle = {
-    padding: '14px',
-    borderRadius: '10px',
-    backgroundColor: colors.loginInputBg, 
-    color: colors.loginInputBlue, 
-    fontWeight: 'bold',
-    fontSize: '14px',
-    outline: 'none',
-    transition: 'border-color 0.2s, box-shadow 0.2s',
-    boxSizing: 'border-box',
-    border: '2px solid #bae6fd' 
+    padding: '14px', borderRadius: '10px', backgroundColor: colors.loginInputBg, color: colors.loginInputBlue,
+    fontWeight: 'bold', fontSize: '14px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
+    boxSizing: 'border-box', border: '2px solid #bae6fd'
   };
-
-  const loginInputStyle = {
-    ...baseInputStyle,
-    width: '100%'
-  };
-
+ 
+  const loginInputStyle = { ...baseInputStyle, width: '100%' };
+ 
   // ==========================================
   // VISTA 1: LOGIN Y REGISTRO
   // ==========================================
   if (!isLoggedIn) {
     return (
-      <div style={{ 
-        minHeight: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', 
-        justifyContent: 'center', alignItems: 'center', 
+      <div style={{
+        minHeight: '100vh', width: '100vw', display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', alignItems: 'center',
         background: 'linear-gradient(180deg, #7dd3fc 0%, #f0f9ff 70%, #ffffff 100%)',
         padding: '20px', boxSizing: 'border-box', position: 'relative', overflowX: 'hidden'
       }}>
-        
         <style>{`
           input:-webkit-autofill,
-          input:-webkit-autofill:hover, 
+          input:-webkit-autofill:hover,
           input:-webkit-autofill:focus {
             -webkit-text-fill-color: #0369a1 !important;
             box-shadow: 0 0 0px 1000px #f0f9ff inset !important;
             transition: background-color 5000s ease-in-out 0s;
           }
-          
           .beneficios-row {
             display: flex; flex-wrap: nowrap; justify-content: center; gap: 40px; margin-top: 60px; color: #1e293b; text-align: center; max-width: 1000px; padding-bottom: 40px;
           }
-
           @media (max-width: 900px) {
             .beneficios-row { flex-wrap: wrap; gap: 20px; }
             .beneficios-row > div { width: 45% !important; }
@@ -590,59 +467,48 @@ function App() {
             .beneficios-row > div { width: 100% !important; }
           }
         `}</style>
-
+ 
         {renderEcoAlerta()}
-        
+ 
         <div style={{ textAlign: 'center', marginBottom: '-15px', marginTop: '-20px', width: '100%', maxWidth: '840px', zIndex: 1 }}>
           <img src={loginLogoUrl} alt="Logo Grande EcoTrack" style={{ height: '420px', maxWidth: '100%', display: 'block', margin: '0 auto', objectFit: 'contain' }} />
         </div>
-
+ 
         <div style={{ backgroundColor: '#fff', padding: '40px', borderRadius: '25px', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,100,200,0.1)', boxSizing: 'border-box', zIndex: 2 }}>
           <h2 style={{ color: colors.aguaText, marginBottom: '20px', fontWeight: 'bold', fontSize: '24px' }}>{isRegistering ? 'Crear Cuenta Personal' : 'Acceso al Sistema'}</h2>
-  
+ 
           <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {isRegistering && (
-              <input type="text" placeholder="Tu nombre completo" style={loginInputStyle} 
-                onChange={(e) => setFormData({...formData, nombre: e.target.value})} />
+              <input type="text" placeholder="Tu nombre completo" style={loginInputStyle}
+                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} />
             )}
-            <input type="email" placeholder="Correo electrónico" style={loginInputStyle} 
-              onChange={(e) => setFormData({...formData, correo: e.target.value})} />
-            <input type="password" placeholder="Contraseña (mínimo 6 caracteres)" style={loginInputStyle} 
-              onChange={(e) => setFormData({...formData, password: e.target.value})} />
-            
+            <input type="email" placeholder="Correo electrónico" style={loginInputStyle}
+              onChange={(e) => setFormData({ ...formData, correo: e.target.value })} />
+            <input type="password" placeholder="Contraseña (mínimo 6 caracteres)" style={loginInputStyle}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+ 
             <button disabled={isLoggingIn} onClick={async () => {
               const correoValido = formData.correo.trim();
               const passwordValida = formData.password.trim();
-
-              if (!correoValido || !passwordValida) {
-                return mostrarAlerta("Por favor, llena todos los campos obligatorios.", 'error');
-              }
-
+ 
+              if (!correoValido || !passwordValida) return mostrarAlerta("Por favor, llena todos los campos obligatorios.", 'error');
+ 
               const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-              if (!emailRegex.test(correoValido)) {
-                return mostrarAlerta("Correo electrónico inválido (ejemplo: usuario@correo.com).", 'error');
-              }
-
-              if (passwordValida.length < 6) {
-                return mostrarAlerta("La contraseña debe tener un mínimo de 6 caracteres.", 'error');
-              }
-              
+              if (!emailRegex.test(correoValido)) return mostrarAlerta("Correo electrónico inválido (ejemplo: usuario@correo.com).", 'error');
+              if (passwordValida.length < 6) return mostrarAlerta("La contraseña debe tener un mínimo de 6 caracteres.", 'error');
+ 
               if (isRegistering) {
                 const nombreValido = formData.nombre.trim();
-                if (!nombreValido) {
-                  return mostrarAlerta("Por favor, ingresa tu nombre.", 'error');
-                }
-                if (nombreValido.length < 3) {
-                  return mostrarAlerta("El nombre debe tener por lo menos 3 caracteres.", 'error');
-                }
+                if (!nombreValido) return mostrarAlerta("Por favor, ingresa tu nombre.", 'error');
+                if (nombreValido.length < 3) return mostrarAlerta("El nombre debe tener por lo menos 3 caracteres.", 'error');
                 if (!/^[a-zA-Z\u00e1\u00e9\u00ed\u00f3\u00fa\u00c1\u00c9\u00cd\u00d3\u00da\u00f1\u00d1\s]+$/.test(nombreValido)) {
                   return mostrarAlerta("El nombre únicamente acepta letras y espacios.", 'error');
                 }
               }
-
+ 
               setIsLoggingIn(true);
               const url = isRegistering ? 'registro' : 'login';
-              
+ 
               try {
                 const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/${url}`, {
                   method: 'POST',
@@ -654,25 +520,20 @@ function App() {
                   })
                 });
                 const data = await res.json();
-
+ 
                 if (res.ok) {
                   if (isRegistering) {
                     mostrarAlerta("Cuenta creada con éxito. Ya puedes iniciar sesión.", 'success');
                     setIsRegistering(false);
                   } else {
-                    // El rol y la empresa ahora vienen directo de tu tabla `usuarios` en Neon,
-                    // ya no de una lista de correos fija en el frontend.
                     const rolReal = data.rol === 'admin' ? 'admin' : 'user';
                     setUserRol(rolReal);
                     setIsLoggedIn(true);
                     setUserData({ nombre: data.nombre || 'Usuario' });
-
+ 
                     if (rolReal === 'admin') {
-                      // Los administradores eligen con qué empresa trabajar.
                       setHasCompany(false);
                     } else {
-                      // Un usuario normal pertenece a una sola empresa (empresa_id en su cuenta),
-                      // así que entra directo a su dashboard sin pasar por el selector.
                       setCompanyData({
                         id: data.empresa_id || 1,
                         nombreComercial: data.nombre_comercial || 'Empresa',
@@ -695,17 +556,14 @@ function App() {
               {isLoggingIn ? 'Procesando...' : (isRegistering ? 'REGISTRARSE' : 'INICIAR SESIÓN')}
             </button>
           </form>
-          
+ 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '25px' }}>
             <button onClick={() => setIsRegistering(!isRegistering)} style={{ background: 'none', border: 'none', color: colors.loginInputBlue, cursor: 'pointer', textDecoration: 'underline', fontSize: '15px', fontWeight: 'bold' }}>
               {isRegistering ? '¿Ya tienes cuenta? Inicia sesión aquí' : '¿No tienes cuenta? Regístrate aquí'}
             </button>
-            
+ 
             {!isRegistering && (
-              <div style={{ 
-                marginTop: '15px', padding: '20px', borderRadius: '16px', 
-                backgroundColor: '#f8fafc', border: '2px solid #e2e8f0', textAlign: 'center' 
-              }}>
+              <div style={{ marginTop: '15px', padding: '20px', borderRadius: '16px', backgroundColor: '#f8fafc', border: '2px solid #e2e8f0', textAlign: 'center' }}>
                 <p style={{ color: '#1e293b', fontSize: '15px', fontWeight: 'bold', margin: '0 0 6px 0' }}>¿Olvidaste tu contraseña?</p>
                 <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 16px 0', lineHeight: '1.5' }}>
                   Por seguridad, solicita el restablecimiento directamente al administrador del sistema.
@@ -717,7 +575,7 @@ function App() {
             )}
           </div>
         </div>
-
+ 
         <div className="beneficios-row">
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '200px' }}>
             <img src="/ahorro.png" alt="Ahorro de recursos" style={{ width: '70px', height: '70px', marginBottom: '15px', objectFit: 'contain' }} />
@@ -740,7 +598,7 @@ function App() {
             <p style={{ fontSize: '13px', lineHeight: '1.4', opacity: '0.9', margin: 0 }}>Plataforma en la nube moderna, accesible desde cualquier lugar y escalable.</p>
           </div>
         </div>
-
+ 
         <div style={{ position: 'fixed', bottom: '30px', right: '30px', zIndex: 1000, fontFamily: 'sans-serif' }}>
           {isChatOpen ? (
             <div style={{ width: '340px', height: '480px', backgroundColor: '#fff', borderRadius: '20px', boxShadow: '0 15px 35px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: `2px solid ${colors.primary}` }}>
@@ -754,7 +612,7 @@ function App() {
                 </div>
                 <button onClick={() => setIsChatOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '20px', fontWeight: 'bold' }}>✕</button>
               </div>
-
+ 
               <div style={{ flex: 1, padding: '18px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: '#f9fafb' }}>
                 {chatMessages.map((msg, index) => (
                   <div key={index} style={{ alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%', padding: '12px 16px', borderRadius: '14px', fontSize: '14px', lineHeight: '1.5', textAlign: 'left', backgroundColor: msg.sender === 'user' ? colors.primary : '#e5e7eb', color: msg.sender === 'user' ? '#fff' : '#1f2937', fontWeight: msg.sender === 'user' ? 'bold' : 'normal', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
@@ -762,13 +620,13 @@ function App() {
                   </div>
                 ))}
               </div>
-
+ 
               <div style={{ display: 'flex', gap: '6px', padding: '8px 12px', overflowX: 'auto', backgroundColor: '#f3f4f6', borderTop: '1px solid #e5e7eb' }}>
                 {['Olvidé mi contraseña', '¿Qué es EcoTrack?', '¿Cómo agrego una empresa?', '¿Cómo funcionan los sensores?'].map(text => (
                   <button key={text} onClick={() => gestionarEnvioMensaje(text)} style={{ whiteSpace: 'nowrap', padding: '7px 12px', borderRadius: '20px', border: `2px solid ${colors.primary}`, background: '#fff', color: colors.primary, fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s' }}>{text}</button>
                 ))}
               </div>
-
+ 
               <div style={{ padding: '12px', display: 'flex', gap: '10px', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
                 <input type="text" placeholder="Escribe tu consulta..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') gestionarEnvioMensaje(); }} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '2px solid #ddd', fontSize: '14px', outline: 'none', color: '#1f2937', fontWeight: 'bold' }} />
                 <button onClick={() => gestionarEnvioMensaje()} style={{ backgroundColor: colors.primary, color: '#fff', border: 'none', padding: '0 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Enviar</button>
@@ -781,7 +639,7 @@ function App() {
       </div>
     );
   }
-
+ 
   // ==========================================
   // VISTA 2: SELECCIÓN DE EMPRESA
   // ==========================================
@@ -794,8 +652,8 @@ function App() {
           <div style={{ marginBottom: '25px', fontWeight: 'bold', color: userRol === 'admin' ? '#ef4444' : colors.aguaText, fontSize: '16px', backgroundColor: userRol === 'admin' ? '#fee2e2' : '#e0f2fe', padding: '10px', borderRadius: '10px', display: 'inline-block' }}>
             Nivel de Acceso Asignado: {userRol.toUpperCase()}
           </div>
-          <p style={{color: '#4b5563', fontSize: '15px', lineHeight: '1.6', marginBottom: '30px'}}>Selecciona la entidad o sucursal correspondiente para comenzar a gestionar los datos de consumo.</p>
-
+          <p style={{ color: '#4b5563', fontSize: '15px', lineHeight: '1.6', marginBottom: '30px' }}>Selecciona la entidad o sucursal correspondiente para comenzar a gestionar los datos de consumo.</p>
+ 
           {cargandoEmpresas ? (
             <p style={{ color: '#6b7280', fontWeight: 'bold' }}>Cargando empresas...</p>
           ) : (
@@ -807,12 +665,7 @@ function App() {
                   <button
                     key={empresa.id}
                     onClick={() => {
-                      setCompanyData({
-                        id: empresa.id,
-                        nombreComercial: empresa.nombre_comercial,
-                        rfc: empresa.rfc,
-                        ciudad: empresa.ciudad
-                      });
+                      setCompanyData({ id: empresa.id, nombreComercial: empresa.nombre_comercial, rfc: empresa.rfc, ciudad: empresa.ciudad });
                       setHasCompany(true);
                     }}
                     style={{ padding: '18px', background: colors.primary, color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', width: '100%', fontSize: '17px', boxShadow: '0 5px 10px rgba(0,0,0,0.1)' }}
@@ -823,24 +676,24 @@ function App() {
               )}
             </div>
           )}
-
+ 
           {mostrarFormNuevaEmpresa ? (
             <div style={{ marginTop: '10px', padding: '20px', borderRadius: '16px', backgroundColor: '#f8fafc', border: '2px solid #e2e8f0', textAlign: 'left' }}>
               <label style={{ fontWeight: 'bold', color: colors.aguaText, fontSize: '13px', marginBottom: '6px', display: 'block' }}>Nombre comercial *</label>
               <input type="text" placeholder="Ej. Recicladora del Norte" style={{ ...loginInputStyle, marginBottom: '12px' }}
                 value={nuevaEmpresa.nombreComercial}
                 onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, nombreComercial: e.target.value })} />
-
+ 
               <label style={{ fontWeight: 'bold', color: colors.aguaText, fontSize: '13px', marginBottom: '6px', display: 'block' }}>RFC (opcional)</label>
               <input type="text" placeholder="RFC" style={{ ...loginInputStyle, marginBottom: '12px' }}
                 value={nuevaEmpresa.rfc}
                 onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, rfc: e.target.value })} />
-
+ 
               <label style={{ fontWeight: 'bold', color: colors.aguaText, fontSize: '13px', marginBottom: '6px', display: 'block' }}>Ciudad (opcional)</label>
               <input type="text" placeholder="Ciudad" style={{ ...loginInputStyle, marginBottom: '18px' }}
                 value={nuevaEmpresa.ciudad}
                 onChange={(e) => setNuevaEmpresa({ ...nuevaEmpresa, ciudad: e.target.value })} />
-
+ 
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button disabled={creandoEmpresa} onClick={handleCrearEmpresa} style={{ flex: 1, padding: '14px', background: creandoEmpresa ? '#9ca3af' : colors.primary, color: '#fff', border: 'none', borderRadius: '10px', cursor: creandoEmpresa ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
                   {creandoEmpresa ? 'Creando...' : '✔️ Guardar Empresa'}
@@ -857,20 +710,17 @@ function App() {
       </div>
     );
   }
-
+ 
   // ==========================================
   // VISTA 3: DASHBOARD PRINCIPAL
   // ==========================================
-  // El registro más reciente puede venir de un sensor (solo trae luz/agua), así que
-  // para la gráfica de residuos se busca el último registro que sí tenga esos datos.
   const ultimoRegistro = registros.find(r => r.organicos !== null && r.organicos !== undefined) || {};
   return (
     <div style={{ width: '100vw', minHeight: '100vh', backgroundColor: '#f3f4f6', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif', color: '#1f2937', overflowX: 'hidden' }}>
-      
+ 
       <style>{`
         .header-box { display: flex; justify-content: space-between; align-items: center; padding: 15px 50px; background-color: #fff; border-bottom: 5px solid ${colors.primary}; }
         .data-inputs-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; align-items: flex-end; width: 100%; }
-        
         @media (max-width: 950px) {
           .header-box { flex-direction: column; gap: 15px; text-align: center; padding: 15px 20px; }
           .header-box > div { justify-content: center; text-align: center !important; }
@@ -880,80 +730,65 @@ function App() {
           .data-inputs-row { grid-template-columns: 1fr; }
         }
       `}</style>
-
+ 
       {renderEcoAlerta()}
-
+ 
       <header className="header-box" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)', zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
           <img src={dashboardHeaderLogoUrl} alt="Logo Horizontal EcoTrack" style={{ height: '75px', objectFit: 'contain' }} />
           <h1 style={{ color: colors.organicosText, margin: 0, fontWeight: 'bold', fontSize: '28px' }}>Plataforma EcoTrack</h1>
         </div>
-        <div style={{display:'flex', alignItems:'center', gap: '25px', flexWrap: 'wrap', justifyContent: 'center'}}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '25px', flexWrap: 'wrap', justifyContent: 'center' }}>
           <div>
             <div style={{ fontWeight: 'bold', color: '#111827', fontSize: '16px' }}>{userData.nombre}</div>
             <div style={{ fontSize: '13px', color: colors.primary, fontWeight: 'bold' }}>📍 {companyData.nombreComercial} (Panel de Control)</div>
           </div>
-          {userRol === 'admin' && (
-            simulacionActiva ? (
-              <button onClick={detenerSimulacion} style={{ background: '#f59e0b', color: '#fff', border: 'none', padding: '12px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', boxShadow: '0 3px 5px rgba(245, 158, 11, 0.3)' }}>
-                🧪 Simulación activa — detener
-              </button>
-            ) : (
-              <button onClick={iniciarSimulacion} style={{ background: '#fff', color: '#f59e0b', border: '2px dashed #f59e0b', padding: '10px 18px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
-                🧪 Iniciar simulación (4h, solo demo)
-              </button>
-            )
-          )}
           <button onClick={handleCambiarEmpresa} style={{ background: colors.aguaText, color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', boxShadow: '0 3px 5px rgba(3, 105, 161, 0.3)' }}>🔄 Cambiar Empresa</button>
           <button onClick={handleLogout} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', boxShadow: '0 3px 5px rgba(239, 68, 68, 0.3)' }}>Cerrar Sesión</button>
         </div>
       </header>
-
+ 
       <main style={{ padding: '20px 40px', flex: 1, boxSizing: 'border-box' }}>
-        
+ 
         <div className="header-box" style={{ ...cardStyle, marginBottom: '35px', borderBottom: 'none', borderLeft: `8px solid ${colors.primary}` }}>
           <div>
             <h2 style={{ color: colors.organicosText, marginTop: 0, fontWeight: 'bold', fontSize: '26px' }}>📊 Dashboard de Gestión Ambiental</h2>
             <p style={{ color: '#4b5563', margin: 0, fontSize: '16px', lineHeight: '1.5' }}>Supervisa y administra el impacto ecológico con estadísticas en tiempo real.</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '10px' }}>
-              <select 
-                value={tipoReporte} 
-                onChange={(e) => setTipoReporte(e.target.value)} 
-                style={{ padding: '13px', borderRadius: '10px', border: `3px solid ${colors.primary}`, backgroundColor: '#fff', color: colors.organicosText, fontWeight: 'bold', outline: 'none', fontSize: '14px', cursor: 'pointer' }}
-              >
-                <option value="actual">Reporte: Mes Actual</option>
-                <option value="todos">Reporte: Historial Completo</option>
-              </select>
-              <button onClick={generarReportePDF} style={{ padding: '14px 24px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.15)', fontSize: '14px' }}>
-                🖨️ Descargar Reporte PDF
-              </button>
-            </div>
+            <select
+              value={tipoReporte}
+              onChange={(e) => setTipoReporte(e.target.value)}
+              style={{ padding: '13px', borderRadius: '10px', border: `3px solid ${colors.primary}`, backgroundColor: '#fff', color: colors.organicosText, fontWeight: 'bold', outline: 'none', fontSize: '14px', cursor: 'pointer' }}
+            >
+              <option value="actual">Reporte: Mes Actual</option>
+              <option value="todos">Reporte: Historial Completo</option>
+            </select>
+            <button onClick={generarReportePDF} style={{ padding: '14px 24px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.15)', fontSize: '14px' }}>
+              🖨️ Descargar Reporte PDF
+            </button>
+          </div>
         </div>
-
+ 
         <div style={{ ...cardStyle, marginBottom: '35px', backgroundColor: '#fff', border: '1px solid #e5e7eb' }}>
-          <h3 style={{marginTop:0, color:'#111827', fontWeight: 'bold', fontSize: '20px', marginBottom: '20px'}}>⚡ Captura de Nuevos Consumos</h3>
-          
+          <h3 style={{ marginTop: 0, color: '#111827', fontWeight: 'bold', fontSize: '20px', marginBottom: '20px' }}>⚡ Captura de Nuevos Consumos</h3>
+ 
           <div className="data-inputs-row">
             {[
-              { label: '⚡ Luz (kWh)', value: luz.actual, setter: (val) => setLuz({actual: val}), color: colors.luz, colorText: colors.luzText },
-              { label: '💧 Agua (m³)', value: agua.actual, setter: (val) => setAgua({actual: val}), color: colors.agua, colorText: colors.aguaText },
-              { label: '♻️ Orgánicos (kg)', value: residuos.organicos, setter: (val) => setResiduos({...residuos, organicos: val}), color: colors.organicos, colorText: colors.organicosText },
-              { label: '🗑️ Inorgánicos (kg)', value: residuos.inorganicos, setter: (val) => setResiduos({...residuos, inorganicos: val}), color: colors.inorganicos, colorText: colors.inorganicosText },
-              { label: '⚠️ Otros (kg)', value: residuos.otros, setter: (val) => setResiduos({...residuos, otros: val}), color: colors.otros, colorText: colors.otrosText },
+              { label: '⚡ Luz (kWh)', value: luz.actual, setter: (val) => setLuz({ actual: val }), color: colors.luz, colorText: colors.luzText },
+              { label: '💧 Agua (m³)', value: agua.actual, setter: (val) => setAgua({ actual: val }), color: colors.agua, colorText: colors.aguaText },
+              { label: '♻️ Orgánicos (kg)', value: residuos.organicos, setter: (val) => setResiduos({ ...residuos, organicos: val }), color: colors.organicos, colorText: colors.organicosText },
+              { label: '🗑️ Inorgánicos (kg)', value: residuos.inorganicos, setter: (val) => setResiduos({ ...residuos, inorganicos: val }), color: colors.inorganicos, colorText: colors.inorganicosText },
+              { label: '⚠️ Otros (kg)', value: residuos.otros, setter: (val) => setResiduos({ ...residuos, otros: val }), color: colors.otros, colorText: colors.otrosText },
             ].map((item, idx) => (
               <div key={idx}>
-                <label style={{fontWeight:'bold', color: item.colorText, fontSize: '14px', marginBottom: '8px', display: 'block'}}>{item.label}</label>
-                <input 
-                  type="number" 
-                  value={item.value} 
-                  onChange={(e) => item.setter(e.target.value)} 
-                  style={{...baseInputStyle, width: '100%', borderColor: item.color, borderSize: '3px', fontSize: '15px', padding: '12px'}} 
-                  placeholder="0.00"
-                />
+                <label style={{ fontWeight: 'bold', color: item.colorText, fontSize: '14px', marginBottom: '8px', display: 'block' }}>{item.label}</label>
+                <input type="number" value={item.value} onChange={(e) => item.setter(e.target.value)}
+                  style={{ ...baseInputStyle, width: '100%', borderColor: item.color, borderSize: '3px', fontSize: '15px', padding: '12px' }}
+                  placeholder="0.00" />
               </div>
             ))}
-            
+ 
             <div>
               <button onClick={async () => {
                 const lStr = String(luz.actual).trim();
@@ -961,26 +796,17 @@ function App() {
                 const oStr = String(residuos.organicos).trim();
                 const iStr = String(residuos.inorganicos).trim();
                 const otStr = String(residuos.otros).trim();
-
-                if (!lStr || !aStr || !oStr || !iStr || !otStr) {
-                  return mostrarAlerta("Error: Todos los campos son obligatorios. No dejes ninguno vacío.", 'error');
-                }
+ 
+                if (!lStr || !aStr || !oStr || !iStr || !otStr) return mostrarAlerta("Error: Todos los campos son obligatorios. No dejes ninguno vacío.", 'error');
                 if (Number(lStr) <= 0 || Number(aStr) <= 0 || Number(oStr) <= 0 || Number(iStr) <= 0 || Number(otStr) <= 0) {
                   return mostrarAlerta("Error: Todos los consumos registrados deben ser estrictamente mayores a 0.", 'error');
                 }
-                
+ 
                 try {
                   const res = await fetch('https://ecotrack-server-v1.onrender.com/api/registros', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                      luz: Number(lStr), 
-                      agua: Number(aStr), 
-                      organicos: Number(oStr), 
-                      inorganicos: Number(iStr), 
-                      otros: Number(otStr),
-                      empresa_id: companyData.id
-                    })
+                    body: JSON.stringify({ luz: Number(lStr), agua: Number(aStr), organicos: Number(oStr), inorganicos: Number(iStr), otros: Number(otStr), empresa_id: companyData.id })
                   });
                   if (res.ok) {
                     mostrarAlerta("Registro de consumo guardado exitosamente.", 'success');
@@ -996,22 +822,21 @@ function App() {
             </div>
           </div>
         </div>
-
+ 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '30px', marginBottom: '35px' }}>
           <GraficaLuz datos={registros} />
           <GraficaAgua datos={registros} />
           <GraficaResiduos ultimoRegistro={ultimoRegistro} />
         </div>
-
+ 
         <div style={{ ...cardStyle, backgroundColor: '#fff', border: `3px solid ${colors.agua}`, padding: '20px' }}>
           <h3 style={{ marginTop: 0, color: '#111827', fontWeight: 'bold', fontSize: '20px', borderBottom: '3px solid #e5e7eb', paddingBottom: '15px', marginBottom: '20px' }}>📅 Historial de Registros</h3>
-          
+ 
           <div style={{ width: '100%', overflowX: 'auto' }}>
             <table style={{ width: '100%', minWidth: '800px', borderCollapse: 'collapse', textAlign: 'center' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f3f4f6', color: '#1f2937', fontSize: '14px', borderBottom: '3px solid #d1d5db' }}>
                   <th style={{ padding: '15px', fontWeight: 'bold' }}>Fecha</th>
-                  <th style={{ padding: '15px', fontWeight: 'bold' }}>Origen</th>
                   <th style={{ padding: '15px', fontWeight: 'bold', color: colors.luzText }}>Luz (kWh)</th>
                   <th style={{ padding: '15px', fontWeight: 'bold', color: colors.aguaText }}>Agua (m³)</th>
                   <th style={{ padding: '15px', fontWeight: 'bold', color: colors.organicosText }}>Orgánicos (kg)</th>
@@ -1022,25 +847,16 @@ function App() {
               </thead>
               <tbody>
                 {registros.length === 0 ? (
-                  <tr><td colSpan={userRol === 'admin' ? 8 : 7} style={{ padding: '30px', color: '#6b7280', fontSize: '16px', fontWeight: 'bold' }}>No hay registros disponibles en la base de datos.</td></tr>
+                  <tr><td colSpan={userRol === 'admin' ? 7 : 6} style={{ padding: '30px', color: '#6b7280', fontSize: '16px', fontWeight: 'bold' }}>No hay registros disponibles en la base de datos.</td></tr>
                 ) : (
                   registros.map((row) => {
                     const isEditing = userRol === 'admin' && editingRowId === row.id;
                     const idRegistro = row.id;
-                    
+ 
                     return (
                       <tr key={idRegistro} style={{ borderBottom: '1px solid #e5e7eb', backgroundColor: isEditing ? '#f0f9ff' : 'transparent', transition: 'background-color 0.2s' }}>
                         <td style={{ padding: '15px', fontSize: '14px', color: '#4b5563', fontWeight: 'bold' }}>{formatearFecha(row.fecha_registro)}</td>
-                        <td style={{ padding: '15px', fontSize: '13px', fontWeight: 'bold' }}>
-                          {row.origen === 'sensor' ? (
-                            <span style={{ color: colors.aguaText }}>🤖 Sensor</span>
-                          ) : row.origen === 'simulacion' ? (
-                            <span style={{ color: '#f59e0b' }}>🧪 Simulación</span>
-                          ) : (
-                            <span style={{ color: colors.organicosText }}>✍️ Manual</span>
-                          )}
-                        </td>
-                        
+ 
                         {[
                           { key: 'luz', value: row.luz, color: colors.luzText, border: colors.luz },
                           { key: 'agua', value: row.agua, color: colors.aguaText, border: colors.agua },
@@ -1050,12 +866,9 @@ function App() {
                         ].map(cell => (
                           <td key={cell.key} style={{ padding: '15px', fontWeight: 'bold', color: cell.color, fontSize: '15px' }}>
                             {isEditing ? (
-                              <input 
-                                type="number" 
-                                style={{...baseInputStyle, width: '90px', padding: '8px', fontSize: '14px', textAlign: 'center', borderColor: cell.border}} 
-                                value={editRowData[cell.key]} 
-                                onChange={(e) => setEditRowData({...editRowData, [cell.key]: e.target.value})} 
-                              />
+                              <input type="number" style={{ ...baseInputStyle, width: '90px', padding: '8px', fontSize: '14px', textAlign: 'center', borderColor: cell.border }}
+                                value={editRowData[cell.key]}
+                                onChange={(e) => setEditRowData({ ...editRowData, [cell.key]: e.target.value })} />
                             ) : (
                               cell.value === null || cell.value === undefined
                                 ? '—'
@@ -1063,7 +876,7 @@ function App() {
                             )}
                           </td>
                         ))}
-                        
+ 
                         {userRol === 'admin' && (
                           <td style={{ padding: '15px', display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
                             {isEditing ? (
@@ -1074,25 +887,17 @@ function App() {
                                   const eoStr = editRowData.organicos !== undefined && editRowData.organicos !== null ? String(editRowData.organicos).trim() : '';
                                   const eiStr = editRowData.inorganicos !== undefined && editRowData.inorganicos !== null ? String(editRowData.inorganicos).trim() : '';
                                   const eotStr = editRowData.otros !== undefined && editRowData.otros !== null ? String(editRowData.otros).trim() : '';
-
-                                  if (!elStr || !eaStr || !eoStr || !eiStr || !eotStr) {
-                                    return mostrarAlerta("Error: No puedes dejar campos en blanco durante la edición.", 'error');
-                                  }
+ 
+                                  if (!elStr || !eaStr || !eoStr || !eiStr || !eotStr) return mostrarAlerta("Error: No puedes dejar campos en blanco durante la edición.", 'error');
                                   if (Number(elStr) <= 0 || Number(eaStr) <= 0 || Number(eoStr) <= 0 || Number(eiStr) <= 0 || Number(eotStr) <= 0) {
                                     return mostrarAlerta("Error: Todos los valores ingresados deben ser mayores a 0.", 'error');
                                   }
-
+ 
                                   try {
                                     const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/registros/${idRegistro}`, {
                                       method: 'PUT',
                                       headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        luz: Number(elStr),
-                                        agua: Number(eaStr),
-                                        organicos: Number(eoStr),
-                                        inorganicos: Number(eiStr),
-                                        otros: Number(eotStr)
-                                      })
+                                      body: JSON.stringify({ luz: Number(elStr), agua: Number(eaStr), organicos: Number(eoStr), inorganicos: Number(eiStr), otros: Number(eotStr) })
                                     });
                                     if (res.ok) {
                                       mostrarAlerta("Registro histórico actualizado correctamente.", 'success');
@@ -1113,7 +918,7 @@ function App() {
                                   setEditingRowId(idRegistro);
                                   setEditRowData({ luz: row.luz, agua: row.agua, organicos: row.organicos, inorganicos: row.inorganicos, otros: row.otros });
                                 }} style={{ background: colors.agua, color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>✏️ Editar</button>
-                                
+ 
                                 <button onClick={async () => {
                                   if (window.confirm("¿Estás seguro de eliminar este registro histórico? Esta acción es irreversible.")) {
                                     try {
@@ -1142,12 +947,13 @@ function App() {
           </div>
         </div>
       </main>
-      
+ 
       <footer style={{ textAlign: 'center', padding: '20px', color: '#6b7280', fontSize: '14px', borderTop: '1px solid #e5e7eb', backgroundColor: '#fff' }}>
         © 2026 Plataforma EcoTrack. Todos los derechos reservados.
       </footer>
     </div>
   );
 }
-
+ 
 export default App;
+ 
