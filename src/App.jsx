@@ -71,41 +71,111 @@ function GraficaAgua({ datos }) {
   );
 }
 
-function GraficaResiduos({ ultimoRegistro }) {
+// Residuos: pastel con el total del periodo + barras apiladas con la evolución diaria
+function GraficaResiduos({ registros, tipoReporte }) {
+  const [vista, setVista] = useState('total');
+
+  const ahora = new Date();
+  const filtrados = tipoReporte === 'actual'
+    ? registros.filter(r => {
+        const d = new Date(r.fecha_registro);
+        return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
+      })
+    : registros;
+
+  const conResiduos = filtrados.filter(r =>
+    [r.organicos, r.inorganicos, r.otros].some(v => v !== null && v !== undefined)
+  );
+
+  const totales = conResiduos.reduce(
+    (acc, r) => ({
+      organicos: acc.organicos + (Number(r.organicos) || 0),
+      inorganicos: acc.inorganicos + (Number(r.inorganicos) || 0),
+      otros: acc.otros + (Number(r.otros) || 0)
+    }),
+    { organicos: 0, inorganicos: 0, otros: 0 }
+  );
+
   const pieDataRaw = [
-    { name: 'Orgánicos', value: Number(ultimoRegistro.organicos) || 0 },
-    { name: 'Inorgánicos', value: Number(ultimoRegistro.inorganicos) || 0 },
-    { name: 'Otros', value: Number(ultimoRegistro.otros) || 0 },
+    { name: 'Orgánicos', value: Number(totales.organicos.toFixed(2)) },
+    { name: 'Inorgánicos', value: Number(totales.inorganicos.toFixed(2)) },
+    { name: 'Otros', value: Number(totales.otros.toFixed(2)) },
   ].filter(d => d.value > 0);
   const datosGraficoPastel = pieDataRaw.length > 0 ? pieDataRaw : [{ name: 'Sin datos', value: 1 }];
-  const coloresPastel = pieDataRaw.length > 0 ? [colors.organicos, colors.inorganicos, colors.otros] : ['#d1d5db'];
+  const coloresMapa = { 'Orgánicos': colors.organicos, 'Inorgánicos': colors.inorganicos, 'Otros': colors.otros };
+
+  const dos = (n) => String(n).padStart(2, '0');
+  const porDiaMapa = {};
+  conResiduos.forEach(r => {
+    const d = new Date(r.fecha_registro);
+    if (isNaN(d.getTime())) return;
+    const clave = `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+    if (!porDiaMapa[clave]) {
+      porDiaMapa[clave] = {
+        clave,
+        etiqueta: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+        organicos: 0, inorganicos: 0, otros: 0
+      };
+    }
+    porDiaMapa[clave].organicos += Number(r.organicos) || 0;
+    porDiaMapa[clave].inorganicos += Number(r.inorganicos) || 0;
+    porDiaMapa[clave].otros += Number(r.otros) || 0;
+  });
+  const datosPorDia = Object.values(porDiaMapa).sort((a, b) => a.clave.localeCompare(b.clave));
+
+  const estiloTab = (activa) => ({
+    padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px',
+    border: `2px solid ${colors.organicos}`,
+    backgroundColor: activa ? colors.organicos : '#fff',
+    color: activa ? '#fff' : colors.organicosText
+  });
+
   return (
     <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '20px', boxShadow: '0 8px 20px rgba(0,0,0,0.08)', border: `2px solid ${colors.organicos}`, flex: '1 1 300px' }}>
-      <h3 style={{ marginTop: 0, marginBottom: '20px', color: colors.organicosText, fontSize: '18px', textAlign: 'center', fontWeight: 'bold' }}>♻️ Distribución de Residuos</h3>
+      <h3 style={{ marginTop: 0, marginBottom: '12px', color: colors.organicosText, fontSize: '18px', textAlign: 'center', fontWeight: 'bold' }}>♻️ Residuos</h3>
+
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '14px' }}>
+        <button onClick={() => setVista('total')} style={estiloTab(vista === 'total')}>Distribución total</button>
+        <button onClick={() => setVista('evolucion')} style={estiloTab(vista === 'evolucion')}>Evolución diaria</button>
+      </div>
+
       <div style={{ width: '100%', height: 250, display: 'flex', justifyContent: 'center' }}>
         <ResponsiveContainer>
-          <PieChart>
-            <Pie data={datosGraficoPastel} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" stroke="none">
-              {datosGraficoPastel.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={coloresPastel[index % coloresPastel.length]} style={{ outline: 'none' }} />
-              ))}
-            </Pie>
-            <Tooltip contentStyle={{ fontWeight: 'bold', borderRadius: '8px' }} formatter={(value) => pieDataRaw.length > 0 ? `${value} kg` : '0 kg'} />
-            <Legend wrapperStyle={{ fontWeight: 'bold' }} />
-          </PieChart>
+          {vista === 'total' ? (
+            <PieChart>
+              <Pie data={datosGraficoPastel} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={5} dataKey="value" stroke="none">
+                {datosGraficoPastel.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={pieDataRaw.length > 0 ? coloresMapa[entry.name] : '#d1d5db'} style={{ outline: 'none' }} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={{ fontWeight: 'bold', borderRadius: '8px' }} formatter={(value) => pieDataRaw.length > 0 ? `${value} kg` : '0 kg'} />
+              <Legend wrapperStyle={{ fontWeight: 'bold' }} />
+            </PieChart>
+          ) : (
+            <BarChart data={datosPorDia}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="etiqueta" style={{ fontSize: '12px', fontWeight: 'bold', fill: '#374151' }} />
+              <YAxis style={{ fontSize: '12px', fontWeight: 'bold', fill: '#374151' }} />
+              <Tooltip contentStyle={{ fontWeight: 'bold', borderRadius: '8px' }} formatter={(value) => `${Number(value).toFixed(2)} kg`} />
+              <Legend wrapperStyle={{ fontWeight: 'bold' }} />
+              <Bar dataKey="organicos" name="Orgánicos" stackId="res" fill={colors.organicos} />
+              <Bar dataKey="inorganicos" name="Inorgánicos" stackId="res" fill={colors.inorganicos} />
+              <Bar dataKey="otros" name="Otros" stackId="res" fill={colors.otros} radius={[6, 6, 0, 0]} />
+            </BarChart>
+          )}
         </ResponsiveContainer>
       </div>
+
+      {vista === 'evolucion' && datosPorDia.length === 0 && (
+        <p style={{ textAlign: 'center', color: '#6b7280', fontWeight: 'bold', fontSize: '13px', margin: '8px 0 0 0' }}>Aún no hay residuos capturados en este periodo.</p>
+      )}
     </div>
   );
 }
 
 // ==========================================
-// SIMULACIÓN DE SENSORES (empresa pequeña, sin control visible)
-// Luz y agua son lecturas continuas (sensores). Los residuos NO se simulan
-// en vivo: se pesan y capturan una vez al día (bitácora de pesaje).
+// SIMULACIÓN DE SENSORES (luz y agua; los residuos se capturan a mano)
 // ==========================================
-// MODO_DEMO = true  -> lecturas cada 10 s y sin restricción de horario (stand)
-// MODO_DEMO = false -> comportamiento realista (cada 90 s, solo de 7:00 a 21:00)
 const MODO_DEMO = true;
 const INTERVALO_SIMULACION_MS = MODO_DEMO ? 10000 : 90000;
 
@@ -113,8 +183,8 @@ const claveSimulacion = (empresaId) => `ecotrack_sim_${empresaId}`;
 const obtenerFechaHoy = () => new Date().toISOString().slice(0, 10);
 
 const nuevoObjetivoDiario = () => ({
-  luz: 18 + Math.random() * 37,     // 18–55 kWh/día, escala de empresa pequeña
-  agua: 0.3 + Math.random() * 1.3   // 0.3–1.6 m³/día
+  luz: 18 + Math.random() * 37,
+  agua: 0.3 + Math.random() * 1.3
 });
 
 const avanzarHaciaObjetivo = (valorActual, objetivo, hora) => {
@@ -122,7 +192,6 @@ const avanzarHaciaObjetivo = (valorActual, objetivo, hora) => {
   if (!horarioLaboral) return valorActual;
   const restante = Math.max(objetivo - valorActual, 0);
   if (MODO_DEMO) {
-    // Avance visible: 2–4 % del objetivo diario por lectura
     const pasoDemo = Math.min(restante, objetivo * (0.02 + Math.random() * 0.02));
     return Number((valorActual + pasoDemo).toFixed(3));
   }
@@ -207,9 +276,7 @@ function App() {
     if (isLoggedIn && !hasCompany) cargarEmpresas();
   }, [isLoggedIn, hasCompany]);
 
-  // Simulación continua, sin botón: arranca sola al entrar al dashboard y
-  // actualiza el mismo registro del día en vez de crear uno nuevo cada vez.
-  // Solo simula luz y agua; los residuos se capturan una vez al día.
+  // Simulación continua de luz y agua
   useEffect(() => {
     if (!isLoggedIn || !hasCompany || !companyData.id) return;
 
@@ -325,6 +392,7 @@ function App() {
     return isNaN(d.getTime()) ? new Date().toLocaleDateString() : d.toLocaleDateString();
   };
 
+  // Chatbot de soporte
   const gestionarEnvioMensaje = (textoDirecto = null) => {
     const textoAEnviar = textoDirecto || chatInput;
     if (!textoAEnviar.trim()) return;
@@ -346,7 +414,7 @@ function App() {
         respuestaBot = 'Al iniciar sesión puedes elegir la empresa con la que quieres trabajar, o crear una nueva con el botón "+ Agregar nueva empresa" en esa misma pantalla.';
       } else if (textoGuardado.includes('sensor')) {
         respuestaBot = 'Los sensores de luz y agua envían sus lecturas automáticamente y el panel se actualiza solo, sin que tengas que hacer nada.';
-      } else if (textoGuardado.includes('pdf') || textoGuardado.includes('reporte')) {
+      } else if (textoGuardado.includes('pdf') || textoGuardado.includes('reporte') || textoGuardado.includes('excel') || textoGuardado.includes('csv')) {
         respuestaBot = 'Puedes descargar tu reporte en PDF, CSV o Excel desde los botones en la parte superior del dashboard.';
       } else if (textoGuardado.includes('gracias')) {
         respuestaBot = '¡Con gusto! Si te surge otra duda, aquí estaré. 🍃';
@@ -358,6 +426,7 @@ function App() {
     }, 800);
   };
 
+  // Reporte PDF
   const generarReportePDF = () => {
     try {
       const fechaActual = new Date();
@@ -435,9 +504,7 @@ function App() {
     }
   };
 
-  // ==========================================
-  // EXPORTACIÓN CSV / EXCEL (mismo filtro de periodo que el PDF)
-  // ==========================================
+  // Exportación CSV / Excel
   const dosDigitos = (n) => String(n).padStart(2, '0');
   const fechaParaExportar = (fechaRaw) => {
     const d = new Date(fechaRaw);
@@ -509,7 +576,6 @@ function App() {
         columnas.join(','),
         ...filas.map(f => columnas.map(c => escapar(f[c])).join(','))
       ].join('\r\n');
-      // El BOM (\uFEFF) hace que Excel respete los acentos y los símbolos (m³)
       descargarArchivo('\uFEFF' + csv, `Reporte_EcoTrack_${sufijo}.csv`, 'text/csv;charset=utf-8;');
       mostrarAlerta('CSV generado correctamente.', 'success');
     } catch (error) {
@@ -753,7 +819,7 @@ function App() {
 
         <div style={{ position: 'fixed', bottom: '30px', right: '30px', zIndex: 1000, fontFamily: 'sans-serif' }}>
           {isChatOpen ? (
-            <div style={{ width: '340px', height: '480px', backgroundColor: '#fff', borderRadius: '20px', boxShadow: '0 15px 35px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: `2px solid ${colors.primary}` }}>
+            <div style={{ width: '340px', maxWidth: 'calc(100vw - 40px)', height: '480px', backgroundColor: '#fff', borderRadius: '20px', boxShadow: '0 15px 35px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden', border: `2px solid ${colors.primary}` }}>
               <div style={{ backgroundColor: '#064e3b', color: '#fff', padding: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span style={{ fontSize: '22px' }}>🍃</span>
@@ -780,7 +846,7 @@ function App() {
               </div>
 
               <div style={{ padding: '12px', display: 'flex', gap: '10px', backgroundColor: '#fff', borderTop: '1px solid #e5e7eb' }}>
-                <input type="text" placeholder="Escribe tu consulta..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') gestionarEnvioMensaje(); }} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '2px solid #ddd', fontSize: '14px', outline: 'none', color: '#1f2937', fontWeight: 'bold' }} />
+                <input type="text" placeholder="Escribe tu consulta..." value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') gestionarEnvioMensaje(); }} style={{ flex: 1, minWidth: 0, padding: '12px', borderRadius: '10px', border: '2px solid #ddd', fontSize: '14px', outline: 'none', color: '#1f2937', fontWeight: 'bold' }} />
                 <button onClick={() => gestionarEnvioMensaje()} style={{ backgroundColor: colors.primary, color: '#fff', border: 'none', padding: '0 20px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>Enviar</button>
               </div>
             </div>
@@ -797,9 +863,9 @@ function App() {
   // ==========================================
   if (isLoggedIn && !hasCompany) {
     return (
-      <div style={{ height: '100vh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#ecfdf5', background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)' }}>
+      <div style={{ minHeight: '100vh', width: '100vw', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px', boxSizing: 'border-box', backgroundColor: '#ecfdf5', background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)' }}>
         {renderEcoAlerta()}
-        <div style={{ ...cardStyle, width: '480px', textAlign: 'center', padding: '40px', border: `3px solid ${colors.primary}` }}>
+        <div style={{ ...cardStyle, width: '100%', maxWidth: '480px', boxSizing: 'border-box', textAlign: 'center', padding: '40px 25px', border: `3px solid ${colors.primary}` }}>
           <h2 style={{ color: colors.organicosText, fontWeight: 'bold', fontSize: '28px', marginBottom: '15px' }}>Bienvenido al Panel, {userData.nombre}</h2>
           <div style={{ marginBottom: '25px', fontWeight: 'bold', color: userRol === 'admin' ? '#ef4444' : colors.aguaText, fontSize: '16px', backgroundColor: userRol === 'admin' ? '#fee2e2' : '#e0f2fe', padding: '10px', borderRadius: '10px', display: 'inline-block' }}>
             Nivel de Acceso Asignado: {userRol.toUpperCase()}
@@ -866,7 +932,6 @@ function App() {
   // ==========================================
   // VISTA 3: DASHBOARD PRINCIPAL
   // ==========================================
-  const ultimoRegistro = registros.find(r => r.organicos !== null && r.organicos !== undefined) || {};
   return (
     <div style={{ width: '100vw', minHeight: '100vh', backgroundColor: '#f3f4f6', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif', color: '#1f2937', overflowX: 'hidden' }}>
 
@@ -880,6 +945,7 @@ function App() {
         }
         @media (max-width: 600px) {
           .data-inputs-row { grid-template-columns: 1fr; }
+          .main-dashboard { padding: 15px 12px !important; }
         }
       `}</style>
 
@@ -900,7 +966,7 @@ function App() {
         </div>
       </header>
 
-      <main style={{ padding: '20px 40px', flex: 1, boxSizing: 'border-box' }}>
+      <main className="main-dashboard" style={{ padding: '20px 40px', flex: 1, boxSizing: 'border-box' }}>
 
         <div className="header-box" style={{ ...cardStyle, marginBottom: '35px', borderBottom: 'none', borderLeft: `8px solid ${colors.primary}` }}>
           <div>
@@ -984,7 +1050,7 @@ function App() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '30px', marginBottom: '35px' }}>
           <GraficaLuz datos={registros} />
           <GraficaAgua datos={registros} />
-          <GraficaResiduos ultimoRegistro={ultimoRegistro} />
+          <GraficaResiduos registros={registros} tipoReporte={tipoReporte} />
         </div>
 
         <div style={{ ...cardStyle, backgroundColor: '#fff', border: `3px solid ${colors.agua}`, padding: '20px' }}>
