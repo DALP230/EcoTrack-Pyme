@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const loginLogoUrl = '/Logo-Ecotrack%20(2).png';
 const dashboardHeaderLogoUrl = '/logo-ecotrack.png';
@@ -100,23 +101,31 @@ function GraficaResiduos({ ultimoRegistro }) {
 
 // ==========================================
 // SIMULACIÓN DE SENSORES (empresa pequeña, sin control visible)
-// Ahora incluye luz, agua, organicos, inorganicos y otros.
+// Luz y agua son lecturas continuas (sensores). Los residuos NO se simulan
+// en vivo: se pesan y capturan una vez al día (bitácora de pesaje).
 // ==========================================
+// MODO_DEMO = true  -> lecturas cada 10 s y sin restricción de horario (stand)
+// MODO_DEMO = false -> comportamiento realista (cada 90 s, solo de 7:00 a 21:00)
+const MODO_DEMO = true;
+const INTERVALO_SIMULACION_MS = MODO_DEMO ? 10000 : 90000;
+
 const claveSimulacion = (empresaId) => `ecotrack_sim_${empresaId}`;
 const obtenerFechaHoy = () => new Date().toISOString().slice(0, 10);
 
 const nuevoObjetivoDiario = () => ({
-  luz: 18 + Math.random() * 37,          // 18–55 kWh/día, escala de empresa pequeña
-  agua: 0.3 + Math.random() * 1.3,       // 0.3–1.6 m³/día
-  organicos: 4 + Math.random() * 16,     // 4–20 kg/día
-  inorganicos: 3 + Math.random() * 12,   // 3–15 kg/día
-  otros: 0.5 + Math.random() * 3.5       // 0.5–4 kg/día
+  luz: 18 + Math.random() * 37,     // 18–55 kWh/día, escala de empresa pequeña
+  agua: 0.3 + Math.random() * 1.3   // 0.3–1.6 m³/día
 });
 
 const avanzarHaciaObjetivo = (valorActual, objetivo, hora) => {
-  const horarioLaboral = hora >= 7 && hora <= 21;
+  const horarioLaboral = MODO_DEMO || (hora >= 7 && hora <= 21);
   if (!horarioLaboral) return valorActual;
   const restante = Math.max(objetivo - valorActual, 0);
+  if (MODO_DEMO) {
+    // Avance visible: 2–4 % del objetivo diario por lectura
+    const pasoDemo = Math.min(restante, objetivo * (0.02 + Math.random() * 0.02));
+    return Number((valorActual + pasoDemo).toFixed(3));
+  }
   const paso = restante * (0.03 + Math.random() * 0.05);
   return Number((valorActual + paso).toFixed(3));
 };
@@ -200,78 +209,62 @@ function App() {
 
   // Simulación continua, sin botón: arranca sola al entrar al dashboard y
   // actualiza el mismo registro del día en vez de crear uno nuevo cada vez.
-  // Ahora también avanza y envía organicos, inorganicos y otros.
+  // Solo simula luz y agua; los residuos se capturan una vez al día.
   useEffect(() => {
     if (!isLoggedIn || !hasCompany || !companyData.id) return;
 
     const leerOCrearEstado = () => {
       const hoy = obtenerFechaHoy();
       const guardado = localStorage.getItem(claveSimulacion(companyData.id));
-      let estado = guardado ? JSON.parse(guardado) : null;
+      let estado = null;
+      try {
+        estado = guardado ? JSON.parse(guardado) : null;
+      } catch (e) {
+        estado = null;
+      }
       if (
         !estado ||
         estado.fecha !== hoy ||
-        estado.organicos === undefined ||
-        estado.inorganicos === undefined ||
-        estado.otros === undefined ||
         !estado.objetivo ||
-        estado.objetivo.organicos === undefined
+        estado.objetivo.luz === undefined ||
+        estado.objetivo.agua === undefined
       ) {
-        estado = {
-          fecha: hoy,
-          luz: 0,
-          agua: 0,
-          organicos: 0,
-          inorganicos: 0,
-          otros: 0,
-          objetivo: nuevoObjetivoDiario()
-        };
+        estado = { fecha: hoy, luz: 0, agua: 0, objetivo: nuevoObjetivoDiario() };
         localStorage.setItem(claveSimulacion(companyData.id), JSON.stringify(estado));
       }
       return estado;
     };
 
-    leerOCrearEstado();
-
-    const tick = setInterval(async () => {
-      const estado = leerOCrearEstado();
-      const hora = new Date().getHours();
-      const nuevaLuz = avanzarHaciaObjetivo(estado.luz, estado.objetivo.luz, hora);
-      const nuevaAgua = avanzarHaciaObjetivo(estado.agua, estado.objetivo.agua, hora);
-      const nuevaOrganicos = avanzarHaciaObjetivo(estado.organicos, estado.objetivo.organicos, hora);
-      const nuevaInorganicos = avanzarHaciaObjetivo(estado.inorganicos, estado.objetivo.inorganicos, hora);
-      const nuevaOtros = avanzarHaciaObjetivo(estado.otros, estado.objetivo.otros, hora);
-
-      localStorage.setItem(claveSimulacion(companyData.id), JSON.stringify({
-        ...estado,
-        luz: nuevaLuz,
-        agua: nuevaAgua,
-        organicos: nuevaOrganicos,
-        inorganicos: nuevaInorganicos,
-        otros: nuevaOtros
-      }));
-
+    let enCurso = false;
+    const ejecutarTick = async () => {
+      if (enCurso) return;
+      enCurso = true;
       try {
+        const estado = leerOCrearEstado();
+        const hora = new Date().getHours();
+        const nuevaLuz = avanzarHaciaObjetivo(estado.luz, estado.objetivo.luz, hora);
+        const nuevaAgua = avanzarHaciaObjetivo(estado.agua, estado.objetivo.agua, hora);
+        localStorage.setItem(claveSimulacion(companyData.id), JSON.stringify({ ...estado, luz: nuevaLuz, agua: nuevaAgua }));
+
         await fetch('https://ecotrack-server-v1.onrender.com/api/registros', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            luz: nuevaLuz,
-            agua: nuevaAgua,
-            organicos: nuevaOrganicos,
-            inorganicos: nuevaInorganicos,
-            otros: nuevaOtros,
-            empresa_id: companyData.id,
-            origen: 'simulacion'
-          })
+          body: JSON.stringify({ luz: nuevaLuz, agua: nuevaAgua, empresa_id: companyData.id, origen: 'simulacion' })
         });
         cargarDatos();
       } catch (error) {
         console.error('Error de simulación:', error);
+      } finally {
+        enCurso = false;
       }
-    }, 90000);
+    };
 
-    return () => clearInterval(tick);
+    const primerTick = setTimeout(ejecutarTick, 1500);
+    const tick = setInterval(ejecutarTick, INTERVALO_SIMULACION_MS);
+    return () => {
+      clearTimeout(primerTick);
+      clearInterval(tick);
+    };
   }, [isLoggedIn, hasCompany, companyData.id]);
 
   const handleLogout = () => {
@@ -354,7 +347,7 @@ function App() {
       } else if (textoGuardado.includes('sensor')) {
         respuestaBot = 'Los sensores de luz y agua envían sus lecturas automáticamente y el panel se actualiza solo, sin que tengas que hacer nada.';
       } else if (textoGuardado.includes('pdf') || textoGuardado.includes('reporte')) {
-        respuestaBot = 'Puedes descargar un reporte en PDF desde el botón "🖨️ Descargar Reporte PDF" en la parte superior del dashboard.';
+        respuestaBot = 'Puedes descargar tu reporte en PDF, CSV o Excel desde los botones en la parte superior del dashboard.';
       } else if (textoGuardado.includes('gracias')) {
         respuestaBot = '¡Con gusto! Si te surge otra duda, aquí estaré. 🍃';
       } else if (textoGuardado.includes('qué es') || textoGuardado.includes('ecotrack') || textoGuardado.includes('funciona')) {
@@ -439,6 +432,125 @@ function App() {
       doc.save(nombreArchivo);
     } catch (error) {
       mostrarAlerta("Error al generar el PDF: " + error.message, 'error');
+    }
+  };
+
+  // ==========================================
+  // EXPORTACIÓN CSV / EXCEL (mismo filtro de periodo que el PDF)
+  // ==========================================
+  const dosDigitos = (n) => String(n).padStart(2, '0');
+  const fechaParaExportar = (fechaRaw) => {
+    const d = new Date(fechaRaw);
+    if (isNaN(d.getTime())) return '';
+    return `${dosDigitos(d.getDate())}/${dosDigitos(d.getMonth() + 1)}/${d.getFullYear()}`;
+  };
+
+  const obtenerRegistrosParaExportar = () => {
+    const ahora = new Date();
+    let lista = registros;
+    let periodo = 'Historial Completo';
+    let sufijo = 'Historial';
+    if (tipoReporte === 'actual') {
+      lista = registros.filter(r => {
+        const d = new Date(r.fecha_registro);
+        return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
+      });
+      periodo = `Mes Actual (${ahora.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })})`;
+      sufijo = `${ahora.getMonth() + 1}_${ahora.getFullYear()}`;
+    }
+    const ordenados = [...lista].sort((a, b) => new Date(a.fecha_registro) - new Date(b.fecha_registro));
+    return { lista: ordenados, periodo, sufijo, ahora };
+  };
+
+  const numeroOVacio = (v) => (v === null || v === undefined || v === '' ? '' : Number(v));
+
+  const construirFilasExportacion = (lista) => lista.map(r => {
+    const org = numeroOVacio(r.organicos);
+    const ino = numeroOVacio(r.inorganicos);
+    const otr = numeroOVacio(r.otros);
+    const hayResiduos = org !== '' || ino !== '' || otr !== '';
+    return {
+      'Fecha': fechaParaExportar(r.fecha_registro),
+      'Luz (kWh)': numeroOVacio(r.luz),
+      'Agua (m³)': numeroOVacio(r.agua),
+      'Orgánicos (kg)': org,
+      'Inorgánicos (kg)': ino,
+      'Otros (kg)': otr,
+      'Residuos totales (kg)': hayResiduos ? Number(((org || 0) + (ino || 0) + (otr || 0)).toFixed(2)) : '',
+      'Origen': r.origen || ''
+    };
+  });
+
+  const descargarArchivo = (contenido, nombre, tipo) => {
+    const blob = new Blob([contenido], { type: tipo });
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = nombre;
+    document.body.appendChild(enlace);
+    enlace.click();
+    document.body.removeChild(enlace);
+    URL.revokeObjectURL(url);
+  };
+
+  const generarReporteCSV = () => {
+    try {
+      const { lista, sufijo } = obtenerRegistrosParaExportar();
+      if (lista.length === 0) {
+        return mostrarAlerta("No hay registros almacenados en el periodo seleccionado para exportar.", 'error');
+      }
+      const filas = construirFilasExportacion(lista);
+      const columnas = Object.keys(filas[0]);
+      const escapar = (v) => {
+        const texto = String(v === null || v === undefined ? '' : v);
+        return /[",\n]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+      };
+      const csv = [
+        columnas.join(','),
+        ...filas.map(f => columnas.map(c => escapar(f[c])).join(','))
+      ].join('\r\n');
+      // El BOM (\uFEFF) hace que Excel respete los acentos y los símbolos (m³)
+      descargarArchivo('\uFEFF' + csv, `Reporte_EcoTrack_${sufijo}.csv`, 'text/csv;charset=utf-8;');
+      mostrarAlerta('CSV generado correctamente.', 'success');
+    } catch (error) {
+      mostrarAlerta("Error al generar el CSV: " + error.message, 'error');
+    }
+  };
+
+  const generarReporteExcel = () => {
+    try {
+      const { lista, periodo, sufijo, ahora } = obtenerRegistrosParaExportar();
+      if (lista.length === 0) {
+        return mostrarAlerta("No hay registros almacenados en el periodo seleccionado para exportar.", 'error');
+      }
+      const hojaRegistros = XLSX.utils.json_to_sheet(construirFilasExportacion(lista));
+      hojaRegistros['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 22 }, { wch: 14 }];
+
+      const suma = (campo) => Number(lista.reduce((acc, r) => acc + (Number(r[campo]) || 0), 0).toFixed(3));
+      const hojaResumen = XLSX.utils.aoa_to_sheet([
+        ['Reporte de Sostenibilidad - EcoTrack'],
+        [],
+        ['Empresa', companyData.nombreComercial || 'EcoTrack Principal'],
+        ['Periodo', periodo],
+        ['Generado por', `${userData.nombre || 'Usuario'} (Rol: ${(userRol || 'user').toUpperCase()})`],
+        ['Fecha de emisión', fechaParaExportar(ahora)],
+        [],
+        ['Totales del periodo'],
+        ['Luz (kWh)', suma('luz')],
+        ['Agua (m³)', suma('agua')],
+        ['Orgánicos (kg)', suma('organicos')],
+        ['Inorgánicos (kg)', suma('inorganicos')],
+        ['Otros (kg)', suma('otros')]
+      ]);
+      hojaResumen['!cols'] = [{ wch: 22 }, { wch: 42 }];
+
+      const libro = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(libro, hojaResumen, 'Resumen');
+      XLSX.utils.book_append_sheet(libro, hojaRegistros, 'Registros');
+      XLSX.writeFile(libro, `Reporte_EcoTrack_${sufijo}.xlsx`);
+      mostrarAlerta('Excel generado correctamente.', 'success');
+    } catch (error) {
+      mostrarAlerta("Error al generar el Excel: " + error.message, 'error');
     }
   };
 
@@ -806,6 +918,12 @@ function App() {
             </select>
             <button onClick={generarReportePDF} style={{ padding: '14px 24px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.15)', fontSize: '14px' }}>
               🖨️ Descargar Reporte PDF
+            </button>
+            <button onClick={generarReporteCSV} style={{ padding: '14px 24px', background: '#0369a1', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.15)', fontSize: '14px' }}>
+              📄 Descargar CSV
+            </button>
+            <button onClick={generarReporteExcel} style={{ padding: '14px 24px', background: '#15803d', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.15)', fontSize: '14px' }}>
+              📊 Descargar Excel
             </button>
           </div>
         </div>
