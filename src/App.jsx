@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid, Legend, PieChart, Pie, Cell
@@ -27,10 +27,59 @@ const colors = {
 };
 
 // ==========================================
+// UTILIDADES DE PERIODO Y TOTALES
+// ==========================================
+const dosDigitos = (n) => String(n).padStart(2, '0');
+const mesActualTexto = () => {
+  const a = new Date();
+  return `${a.getFullYear()}-${dosDigitos(a.getMonth() + 1)}`;
+};
+const fmt = (n, dec = 2) => Number(n || 0).toFixed(dec);
+
+const obtenerPeriodo = (tipo, mesPersonalizado) => {
+  if (tipo === 'todos') {
+    return { todos: true, mes: null, anio: null, etiqueta: 'Historial Completo', sufijo: 'Historial' };
+  }
+  const ahora = new Date();
+  let mes = ahora.getMonth();
+  let anio = ahora.getFullYear();
+  if (tipo === 'anterior') {
+    mes -= 1;
+    if (mes < 0) { mes = 11; anio -= 1; }
+  }
+  if (tipo === 'personalizado' && /^\d{4}-\d{2}$/.test(mesPersonalizado || '')) {
+    anio = Number(mesPersonalizado.slice(0, 4));
+    mes = Number(mesPersonalizado.slice(5, 7)) - 1;
+  }
+  const nombre = new Date(anio, mes, 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+  const prefijo = tipo === 'actual' ? 'Mes Actual' : tipo === 'anterior' ? 'Mes Anterior' : 'Mes Seleccionado';
+  return { todos: false, mes, anio, etiqueta: `${prefijo} (${nombre})`, sufijo: `${mes + 1}_${anio}` };
+};
+
+const filtrarPorPeriodo = (lista, periodo) => {
+  if (periodo.todos) return lista;
+  return lista.filter(r => {
+    const d = new Date(r.fecha_registro);
+    return d.getMonth() === periodo.mes && d.getFullYear() === periodo.anio;
+  });
+};
+
+const sumarRegistros = (lista) => lista.reduce(
+  (a, r) => ({
+    luz: a.luz + (Number(r.luz) || 0),
+    agua: a.agua + (Number(r.agua) || 0),
+    organicos: a.organicos + (Number(r.organicos) || 0),
+    inorganicos: a.inorganicos + (Number(r.inorganicos) || 0),
+    otros: a.otros + (Number(r.otros) || 0)
+  }),
+  { luz: 0, agua: 0, organicos: 0, inorganicos: 0, otros: 0 }
+);
+
+// ==========================================
 // GRÁFICAS
 // ==========================================
 function GraficaLuz({ datos }) {
-  const datosCronologicos = [...datos].reverse();
+  const datosCronologicos = [...datos].slice(0, 31).reverse();
   return (
     <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '20px', boxShadow: '0 8px 20px rgba(0,0,0,0.08)', border: `2px solid ${colors.luz}`, flex: '1 1 300px' }}>
       <h3 style={{ marginTop: 0, marginBottom: '20px', color: colors.luzText, fontSize: '18px', textAlign: 'center', fontWeight: 'bold' }}>⚡ Consumo de Luz</h3>
@@ -51,7 +100,7 @@ function GraficaLuz({ datos }) {
 }
 
 function GraficaAgua({ datos }) {
-  const datosCronologicos = [...datos].reverse();
+  const datosCronologicos = [...datos].slice(0, 31).reverse();
   return (
     <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '20px', boxShadow: '0 8px 20px rgba(0,0,0,0.08)', border: `2px solid ${colors.agua}`, flex: '1 1 300px' }}>
       <h3 style={{ marginTop: 0, marginBottom: '20px', color: colors.aguaText, fontSize: '18px', textAlign: 'center', fontWeight: 'bold' }}>💧 Consumo de Agua</h3>
@@ -72,29 +121,13 @@ function GraficaAgua({ datos }) {
 }
 
 // Residuos: pastel con el total del periodo + barras apiladas con la evolución diaria
-function GraficaResiduos({ registros, tipoReporte }) {
+function GraficaResiduos({ registros, periodo }) {
   const [vista, setVista] = useState('total');
 
-  const ahora = new Date();
-  const filtrados = tipoReporte === 'actual'
-    ? registros.filter(r => {
-        const d = new Date(r.fecha_registro);
-        return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
-      })
-    : registros;
+  const tieneResiduos = (r) => [r.organicos, r.inorganicos, r.otros].some(v => v !== null && v !== undefined);
 
-  const conResiduos = filtrados.filter(r =>
-    [r.organicos, r.inorganicos, r.otros].some(v => v !== null && v !== undefined)
-  );
-
-  const totales = conResiduos.reduce(
-    (acc, r) => ({
-      organicos: acc.organicos + (Number(r.organicos) || 0),
-      inorganicos: acc.inorganicos + (Number(r.inorganicos) || 0),
-      otros: acc.otros + (Number(r.otros) || 0)
-    }),
-    { organicos: 0, inorganicos: 0, otros: 0 }
-  );
+  const conResiduosPeriodo = filtrarPorPeriodo(registros, periodo).filter(tieneResiduos);
+  const totales = sumarRegistros(conResiduosPeriodo);
 
   const pieDataRaw = [
     { name: 'Orgánicos', value: Number(totales.organicos.toFixed(2)) },
@@ -104,12 +137,11 @@ function GraficaResiduos({ registros, tipoReporte }) {
   const datosGraficoPastel = pieDataRaw.length > 0 ? pieDataRaw : [{ name: 'Sin datos', value: 1 }];
   const coloresMapa = { 'Orgánicos': colors.organicos, 'Inorgánicos': colors.inorganicos, 'Otros': colors.otros };
 
-  const dos = (n) => String(n).padStart(2, '0');
   const porDiaMapa = {};
-  conResiduos.forEach(r => {
+  registros.filter(tieneResiduos).forEach(r => {
     const d = new Date(r.fecha_registro);
     if (isNaN(d.getTime())) return;
-    const clave = `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+    const clave = `${d.getFullYear()}-${dosDigitos(d.getMonth() + 1)}-${dosDigitos(d.getDate())}`;
     if (!porDiaMapa[clave]) {
       porDiaMapa[clave] = {
         clave,
@@ -121,7 +153,7 @@ function GraficaResiduos({ registros, tipoReporte }) {
     porDiaMapa[clave].inorganicos += Number(r.inorganicos) || 0;
     porDiaMapa[clave].otros += Number(r.otros) || 0;
   });
-  const datosPorDia = Object.values(porDiaMapa).sort((a, b) => a.clave.localeCompare(b.clave));
+  const datosPorDia = Object.values(porDiaMapa).sort((a, b) => a.clave.localeCompare(b.clave)).slice(-31);
 
   const estiloTab = (activa) => ({
     padding: '8px 14px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px',
@@ -134,10 +166,13 @@ function GraficaResiduos({ registros, tipoReporte }) {
     <div style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '20px', boxShadow: '0 8px 20px rgba(0,0,0,0.08)', border: `2px solid ${colors.organicos}`, flex: '1 1 300px' }}>
       <h3 style={{ marginTop: 0, marginBottom: '12px', color: colors.organicosText, fontSize: '18px', textAlign: 'center', fontWeight: 'bold' }}>♻️ Residuos</h3>
 
-      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '14px' }}>
+      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '8px' }}>
         <button onClick={() => setVista('total')} style={estiloTab(vista === 'total')}>Distribución total</button>
         <button onClick={() => setVista('evolucion')} style={estiloTab(vista === 'evolucion')}>Evolución diaria</button>
       </div>
+      <p style={{ textAlign: 'center', color: '#6b7280', fontWeight: 'bold', fontSize: '12px', margin: '0 0 10px 0' }}>
+        {vista === 'total' ? periodo.etiqueta : 'Últimos 31 días'}
+      </p>
 
       <div style={{ width: '100%', height: 250, display: 'flex', justifyContent: 'center' }}>
         <ResponsiveContainer>
@@ -167,36 +202,42 @@ function GraficaResiduos({ registros, tipoReporte }) {
       </div>
 
       {vista === 'evolucion' && datosPorDia.length === 0 && (
-        <p style={{ textAlign: 'center', color: '#6b7280', fontWeight: 'bold', fontSize: '13px', margin: '8px 0 0 0' }}>Aún no hay residuos capturados en este periodo.</p>
+        <p style={{ textAlign: 'center', color: '#6b7280', fontWeight: 'bold', fontSize: '13px', margin: '8px 0 0 0' }}>Aún no hay residuos registrados.</p>
       )}
     </div>
   );
 }
 
 // ==========================================
-// SIMULACIÓN DE SENSORES (luz y agua; los residuos se capturan a mano)
+// SIMULACIÓN DE SENSORES (luz, agua y residuos)
 // ==========================================
 const MODO_DEMO = true;
 const INTERVALO_SIMULACION_MS = MODO_DEMO ? 10000 : 90000;
 
-const claveSimulacion = (empresaId) => `ecotrack_sim_${empresaId}`;
 const obtenerFechaHoy = () => new Date().toISOString().slice(0, 10);
 
-const nuevoObjetivoDiario = () => ({
-  luz: 18 + Math.random() * 37,
-  agua: 0.3 + Math.random() * 1.3
-});
+// Rangos tomados del historial para que lo simulado sea coherente
+const LIMITES_SIMULACION = {
+  luz: { min: 18, max: 55, decimales: 3 },
+  agua: { min: 0.3, max: 1.6, decimales: 3 },
+  organicos: { min: 4, max: 20, decimales: 2 },
+  inorganicos: { min: 3.5, max: 15, decimales: 2 },
+  otros: { min: 0.6, max: 3.6, decimales: 2 }
+};
 
-const avanzarHaciaObjetivo = (valorActual, objetivo, hora) => {
-  const horarioLaboral = MODO_DEMO || (hora >= 7 && hora <= 21);
-  if (!horarioLaboral) return valorActual;
-  const restante = Math.max(objetivo - valorActual, 0);
-  if (MODO_DEMO) {
-    const pasoDemo = Math.min(restante, objetivo * (0.02 + Math.random() * 0.02));
-    return Number((valorActual + pasoDemo).toFixed(3));
+const siguienteLectura = (actual, { min, max, decimales }) => {
+  const rango = max - min;
+  let valor;
+  if (actual === null || actual === undefined || actual === '' || isNaN(Number(actual))) {
+    valor = min + Math.random() * rango;
+  } else {
+    const centro = (min + max) / 2;
+    const variacion = (Math.random() - 0.5) * rango * 0.14;
+    const atraccion = (centro - Number(actual)) * 0.03;
+    valor = Number(actual) + variacion + atraccion;
   }
-  const paso = restante * (0.03 + Math.random() * 0.05);
-  return Number((valorActual + paso).toFixed(3));
+  valor = Math.min(max, Math.max(min, valor));
+  return Number(valor.toFixed(decimales));
 };
 
 // ==========================================
@@ -218,7 +259,10 @@ function App() {
   const [creandoEmpresa, setCreandoEmpresa] = useState(false);
   const [formData, setFormData] = useState({ nombre: '', correo: '', password: '' });
   const [registros, setRegistros] = useState([]);
+  const registrosRef = useRef([]);
+  const datosListosRef = useRef(false);
   const [tipoReporte, setTipoReporte] = useState('actual');
+  const [mesPersonalizado, setMesPersonalizado] = useState(mesActualTexto());
 
   const [luz, setLuz] = useState({ actual: '' });
   const [agua, setAgua] = useState({ actual: '' });
@@ -233,6 +277,8 @@ function App() {
   ]);
   const [alerta, setAlerta] = useState({ mostrar: false, mensaje: '', tipo: 'error' });
 
+  const periodo = obtenerPeriodo(tipoReporte, mesPersonalizado);
+
   const mostrarAlerta = (mensaje, tipo = 'error') => {
     setAlerta({ mostrar: true, mensaje, tipo });
     setTimeout(() => {
@@ -245,7 +291,11 @@ function App() {
     try {
       const res = await fetch(`https://ecotrack-server-v1.onrender.com/api/registros?empresa_id=${companyData.id}`);
       const data = await res.json();
-      if (Array.isArray(data)) setRegistros(data);
+      if (Array.isArray(data)) {
+        registrosRef.current = data;
+        datosListosRef.current = true;
+        setRegistros(data);
+      }
     } catch (error) {
       console.error("Error cargando historial:", error);
     }
@@ -276,49 +326,37 @@ function App() {
     if (isLoggedIn && !hasCompany) cargarEmpresas();
   }, [isLoggedIn, hasCompany]);
 
-  // Simulación continua de luz y agua
+  // Simulación continua de luz, agua y residuos
   useEffect(() => {
     if (!isLoggedIn || !hasCompany || !companyData.id) return;
 
-    const leerOCrearEstado = () => {
-      const hoy = obtenerFechaHoy();
-      const guardado = localStorage.getItem(claveSimulacion(companyData.id));
-      let estado = null;
-      try {
-        estado = guardado ? JSON.parse(guardado) : null;
-      } catch (e) {
-        estado = null;
-      }
-      if (
-        !estado ||
-        estado.fecha !== hoy ||
-        !estado.objetivo ||
-        estado.objetivo.luz === undefined ||
-        estado.objetivo.agua === undefined
-      ) {
-        estado = { fecha: hoy, luz: 0, agua: 0, objetivo: nuevoObjetivoDiario() };
-        localStorage.setItem(claveSimulacion(companyData.id), JSON.stringify(estado));
-      }
-      return estado;
-    };
-
+    datosListosRef.current = false;
+    registrosRef.current = [];
     let enCurso = false;
+
     const ejecutarTick = async () => {
-      if (enCurso) return;
+      if (enCurso || !datosListosRef.current) return;
+      if (!MODO_DEMO) {
+        const hora = new Date().getHours();
+        if (hora < 7 || hora > 21) return;
+      }
       enCurso = true;
       try {
-        const estado = leerOCrearEstado();
-        const hora = new Date().getHours();
-        const nuevaLuz = avanzarHaciaObjetivo(estado.luz, estado.objetivo.luz, hora);
-        const nuevaAgua = avanzarHaciaObjetivo(estado.agua, estado.objetivo.agua, hora);
-        localStorage.setItem(claveSimulacion(companyData.id), JSON.stringify({ ...estado, luz: nuevaLuz, agua: nuevaAgua }));
+        const hoy = obtenerFechaHoy();
+        const filaHoy = registrosRef.current.find(
+          r => r.origen === 'simulacion' && String(r.fecha_registro).slice(0, 10) === hoy
+        );
+        const lectura = {};
+        Object.keys(LIMITES_SIMULACION).forEach(campo => {
+          lectura[campo] = siguienteLectura(filaHoy ? filaHoy[campo] : null, LIMITES_SIMULACION[campo]);
+        });
 
         await fetch('https://ecotrack-server-v1.onrender.com/api/registros', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ luz: nuevaLuz, agua: nuevaAgua, empresa_id: companyData.id, origen: 'simulacion' })
+          body: JSON.stringify({ ...lectura, empresa_id: companyData.id, origen: 'simulacion' })
         });
-        cargarDatos();
+        await cargarDatos();
       } catch (error) {
         console.error('Error de simulación:', error);
       } finally {
@@ -326,7 +364,7 @@ function App() {
       }
     };
 
-    const primerTick = setTimeout(ejecutarTick, 1500);
+    const primerTick = setTimeout(ejecutarTick, 3000);
     const tick = setInterval(ejecutarTick, INTERVALO_SIMULACION_MS);
     return () => {
       clearTimeout(primerTick);
@@ -415,7 +453,7 @@ function App() {
       } else if (textoGuardado.includes('sensor')) {
         respuestaBot = 'Los sensores de luz y agua envían sus lecturas automáticamente y el panel se actualiza solo, sin que tengas que hacer nada.';
       } else if (textoGuardado.includes('pdf') || textoGuardado.includes('reporte') || textoGuardado.includes('excel') || textoGuardado.includes('csv')) {
-        respuestaBot = 'Puedes descargar tu reporte en PDF, CSV o Excel desde los botones en la parte superior del dashboard.';
+        respuestaBot = 'Puedes descargar tu reporte en PDF, CSV o Excel desde los botones en la parte superior del dashboard. Elige el mes actual, el anterior, un mes específico o el historial completo.';
       } else if (textoGuardado.includes('gracias')) {
         respuestaBot = '¡Con gusto! Si te surge otra duda, aquí estaré. 🍃';
       } else if (textoGuardado.includes('qué es') || textoGuardado.includes('ecotrack') || textoGuardado.includes('funciona')) {
@@ -426,24 +464,39 @@ function App() {
     }, 800);
   };
 
-  // Reporte PDF
+  // ==========================================
+  // EXPORTACIÓN (PDF / CSV / EXCEL)
+  // ==========================================
+  const fechaParaExportar = (fechaRaw) => {
+    const d = new Date(fechaRaw);
+    if (isNaN(d.getTime())) return '';
+    return `${dosDigitos(d.getDate())}/${dosDigitos(d.getMonth() + 1)}/${d.getFullYear()}`;
+  };
+
+  const obtenerRegistrosParaExportar = (orden = 'asc') => {
+    const ahora = new Date();
+    const lista = [...filtrarPorPeriodo(registros, periodo)].sort((a, b) =>
+      orden === 'asc'
+        ? new Date(a.fecha_registro) - new Date(b.fecha_registro)
+        : new Date(b.fecha_registro) - new Date(a.fecha_registro)
+    );
+    return { lista, ahora };
+  };
+
+  const validarPeriodoElegido = () => {
+    if (tipoReporte === 'personalizado' && !/^\d{4}-\d{2}$/.test(mesPersonalizado || '')) {
+      mostrarAlerta("Selecciona el mes que quieres descargar.", 'error');
+      return false;
+    }
+    return true;
+  };
+
   const generarReportePDF = () => {
     try {
-      const fechaActual = new Date();
-      const mesActual = fechaActual.getMonth();
-      const anoActual = fechaActual.getFullYear();
+      if (!validarPeriodoElegido()) return;
+      const { lista, ahora } = obtenerRegistrosParaExportar('desc');
 
-      let registrosAExportar = registros;
-      let subTituloPeriodo = "Historial Completo";
-      if (tipoReporte === 'actual') {
-        registrosAExportar = registros.filter(r => {
-          const d = new Date(r.fecha_registro);
-          return d.getMonth() === mesActual && d.getFullYear() === anoActual;
-        });
-        subTituloPeriodo = `Mes Actual (${fechaActual.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })})`;
-      }
-
-      if (registrosAExportar.length === 0) {
+      if (lista.length === 0) {
         return mostrarAlerta("No hay registros almacenados en el periodo seleccionado para exportar.", 'error');
       }
 
@@ -461,72 +514,91 @@ function App() {
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(55, 65, 81);
       doc.text(`Empresa: ${companyData.nombreComercial || 'EcoTrack Principal'}`, 14, 40);
-      doc.text(`Periodo: ${subTituloPeriodo}`, 14, 47);
+      doc.text(`Periodo: ${periodo.etiqueta}`, 14, 47);
       doc.text(`Generado por: ${userData.nombre || 'Usuario'} (Rol: ${(userRol || 'user').toUpperCase()})`, 14, 54);
-      doc.text(`Fecha de emisión: ${fechaActual.toLocaleDateString()}`, 14, 61);
+      doc.text(`Fecha de emisión: ${ahora.toLocaleDateString()}`, 14, 61);
 
-      const tableColumn = ["Fecha", "Luz (kWh)", "Agua (m³)", "Residuos Totales (kg)"];
-      const tableRows = registrosAExportar.map(r => {
-        const totalResiduos = Number(r.organicos || 0) + Number(r.inorganicos || 0) + Number(r.otros || 0);
+      const aplicarTabla = (opciones) => {
+        if (typeof autoTable === 'function') {
+          autoTable(doc, opciones);
+        } else if (typeof doc.autoTable === 'function') {
+          doc.autoTable(opciones);
+        } else {
+          throw new Error("No se pudo vincular el generador de tablas jsPDF.");
+        }
+      };
+
+      const estilosBase = { fontSize: 11, cellPadding: 5, textColor: [31, 41, 55], font: 'helvetica', halign: 'center', lineColor: [209, 213, 219] };
+      const estilosEncabezado = { fillColor: colors.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12 };
+
+      const tableRows = lista.map(r => {
+        const hayResiduos = [r.organicos, r.inorganicos, r.otros].some(v => v !== null && v !== undefined);
+        const totalResiduos = (Number(r.organicos) || 0) + (Number(r.inorganicos) || 0) + (Number(r.otros) || 0);
         return [
           formatearFecha(r.fecha_registro),
-          { content: `${r.luz} kWh`, styles: { textColor: colors.luzText, fontStyle: 'bold' } },
-          { content: `${r.agua} m³`, styles: { textColor: colors.aguaText, fontStyle: 'bold' } },
-          { content: `${totalResiduos} kg`, styles: { textColor: colors.organicosText, fontStyle: 'bold' } }
+          { content: `${fmt(r.luz, 2)} kWh`, styles: { textColor: colors.luzText, fontStyle: 'bold' } },
+          { content: `${fmt(r.agua, 3)} m³`, styles: { textColor: colors.aguaText, fontStyle: 'bold' } },
+          { content: hayResiduos ? `${fmt(totalResiduos, 2)} kg` : '—', styles: { textColor: colors.organicosText, fontStyle: 'bold' } }
         ];
       });
 
-      const opcionesTabla = {
-        head: [tableColumn],
+      aplicarTabla({
+        head: [["Fecha", "Luz (kWh)", "Agua (m³)", "Residuos Totales (kg)"]],
         body: tableRows,
         startY: 68,
         theme: 'grid',
-        styles: { fontSize: 11, cellPadding: 5, textColor: [31, 41, 55], font: 'helvetica', halign: 'center', lineColor: [209, 213, 219] },
-        headStyles: { fillColor: colors.primary, textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12 },
+        styles: estilosBase,
+        headStyles: estilosEncabezado,
         alternateRowStyles: { fillColor: '#f9fafb' }
+      });
+
+      let y = (doc.lastAutoTable && doc.lastAutoTable.finalY ? doc.lastAutoTable.finalY : 68) + 14;
+
+      const dibujarResumen = (titulo, filas) => {
+        const totales = sumarRegistros(filas);
+        const totalResiduos = totales.organicos + totales.inorganicos + totales.otros;
+        if (y > 180) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(colors.organicosText);
+        doc.text(titulo, 14, y);
+
+        aplicarTabla({
+          head: [["Concepto", "Total"]],
+          body: [
+            ["Registros incluidos", String(filas.length)],
+            ["Luz (kWh)", fmt(totales.luz, 2)],
+            ["Agua (m³)", fmt(totales.agua, 3)],
+            ["Residuos orgánicos (kg)", fmt(totales.organicos, 2)],
+            ["Residuos inorgánicos (kg)", fmt(totales.inorganicos, 2)],
+            ["Otros residuos (kg)", fmt(totales.otros, 2)],
+            [{ content: "Residuos totales (kg)", styles: { fontStyle: 'bold' } }, { content: fmt(totalResiduos, 2), styles: { fontStyle: 'bold' } }]
+          ],
+          startY: y + 5,
+          theme: 'grid',
+          styles: estilosBase,
+          headStyles: estilosEncabezado,
+          alternateRowStyles: { fillColor: '#f9fafb' },
+          columnStyles: { 0: { halign: 'left' }, 1: { halign: 'right', fontStyle: 'bold' } }
+        });
+        y = (doc.lastAutoTable && doc.lastAutoTable.finalY ? doc.lastAutoTable.finalY : y + 60) + 14;
       };
 
-      if (typeof autoTable === 'function') {
-        autoTable(doc, opcionesTabla);
-      } else if (typeof doc.autoTable === 'function') {
-        doc.autoTable(opcionesTabla);
-      } else {
-        throw new Error("No se pudo vincular el generador de tablas jsPDF.");
+      dibujarResumen(`Resumen del periodo - ${periodo.etiqueta}`, lista);
+
+      const hoyTexto = fechaParaExportar(ahora);
+      const filasHoy = lista.filter(r => fechaParaExportar(r.fecha_registro) === hoyTexto);
+      if (filasHoy.length > 0) {
+        dibujarResumen(`Total del día (${hoyTexto})`, filasHoy);
       }
 
-      const nombreArchivo = tipoReporte === 'actual'
-        ? `Reporte_EcoTrack_${mesActual + 1}_${anoActual}.pdf`
-        : `Reporte_EcoTrack_Historial.pdf`;
-
-      doc.save(nombreArchivo);
+      doc.save(`Reporte_EcoTrack_${periodo.sufijo}.pdf`);
     } catch (error) {
       mostrarAlerta("Error al generar el PDF: " + error.message, 'error');
     }
-  };
-
-  // Exportación CSV / Excel
-  const dosDigitos = (n) => String(n).padStart(2, '0');
-  const fechaParaExportar = (fechaRaw) => {
-    const d = new Date(fechaRaw);
-    if (isNaN(d.getTime())) return '';
-    return `${dosDigitos(d.getDate())}/${dosDigitos(d.getMonth() + 1)}/${d.getFullYear()}`;
-  };
-
-  const obtenerRegistrosParaExportar = () => {
-    const ahora = new Date();
-    let lista = registros;
-    let periodo = 'Historial Completo';
-    let sufijo = 'Historial';
-    if (tipoReporte === 'actual') {
-      lista = registros.filter(r => {
-        const d = new Date(r.fecha_registro);
-        return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
-      });
-      periodo = `Mes Actual (${ahora.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })})`;
-      sufijo = `${ahora.getMonth() + 1}_${ahora.getFullYear()}`;
-    }
-    const ordenados = [...lista].sort((a, b) => new Date(a.fecha_registro) - new Date(b.fecha_registro));
-    return { lista: ordenados, periodo, sufijo, ahora };
   };
 
   const numeroOVacio = (v) => (v === null || v === undefined || v === '' ? '' : Number(v));
@@ -543,8 +615,7 @@ function App() {
       'Orgánicos (kg)': org,
       'Inorgánicos (kg)': ino,
       'Otros (kg)': otr,
-      'Residuos totales (kg)': hayResiduos ? Number(((org || 0) + (ino || 0) + (otr || 0)).toFixed(2)) : '',
-      'Origen': r.origen || ''
+      'Residuos totales (kg)': hayResiduos ? Number(((org || 0) + (ino || 0) + (otr || 0)).toFixed(2)) : ''
     };
   });
 
@@ -562,7 +633,8 @@ function App() {
 
   const generarReporteCSV = () => {
     try {
-      const { lista, sufijo } = obtenerRegistrosParaExportar();
+      if (!validarPeriodoElegido()) return;
+      const { lista } = obtenerRegistrosParaExportar('asc');
       if (lista.length === 0) {
         return mostrarAlerta("No hay registros almacenados en el periodo seleccionado para exportar.", 'error');
       }
@@ -576,7 +648,7 @@ function App() {
         columnas.join(','),
         ...filas.map(f => columnas.map(c => escapar(f[c])).join(','))
       ].join('\r\n');
-      descargarArchivo('\uFEFF' + csv, `Reporte_EcoTrack_${sufijo}.csv`, 'text/csv;charset=utf-8;');
+      descargarArchivo('\uFEFF' + csv, `Reporte_EcoTrack_${periodo.sufijo}.csv`, 'text/csv;charset=utf-8;');
       mostrarAlerta('CSV generado correctamente.', 'success');
     } catch (error) {
       mostrarAlerta("Error al generar el CSV: " + error.message, 'error');
@@ -585,35 +657,38 @@ function App() {
 
   const generarReporteExcel = () => {
     try {
-      const { lista, periodo, sufijo, ahora } = obtenerRegistrosParaExportar();
+      if (!validarPeriodoElegido()) return;
+      const { lista, ahora } = obtenerRegistrosParaExportar('asc');
       if (lista.length === 0) {
         return mostrarAlerta("No hay registros almacenados en el periodo seleccionado para exportar.", 'error');
       }
       const hojaRegistros = XLSX.utils.json_to_sheet(construirFilasExportacion(lista));
-      hojaRegistros['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 22 }, { wch: 14 }];
+      hojaRegistros['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 22 }];
 
-      const suma = (campo) => Number(lista.reduce((acc, r) => acc + (Number(r[campo]) || 0), 0).toFixed(3));
+      const t = sumarRegistros(lista);
+      const r2 = (n) => Number(n.toFixed(2));
       const hojaResumen = XLSX.utils.aoa_to_sheet([
         ['Reporte de Sostenibilidad - EcoTrack'],
         [],
         ['Empresa', companyData.nombreComercial || 'EcoTrack Principal'],
-        ['Periodo', periodo],
+        ['Periodo', periodo.etiqueta],
         ['Generado por', `${userData.nombre || 'Usuario'} (Rol: ${(userRol || 'user').toUpperCase()})`],
         ['Fecha de emisión', fechaParaExportar(ahora)],
         [],
         ['Totales del periodo'],
-        ['Luz (kWh)', suma('luz')],
-        ['Agua (m³)', suma('agua')],
-        ['Orgánicos (kg)', suma('organicos')],
-        ['Inorgánicos (kg)', suma('inorganicos')],
-        ['Otros (kg)', suma('otros')]
+        ['Luz (kWh)', r2(t.luz)],
+        ['Agua (m³)', Number(t.agua.toFixed(3))],
+        ['Orgánicos (kg)', r2(t.organicos)],
+        ['Inorgánicos (kg)', r2(t.inorganicos)],
+        ['Otros (kg)', r2(t.otros)],
+        ['Residuos totales (kg)', r2(t.organicos + t.inorganicos + t.otros)]
       ]);
       hojaResumen['!cols'] = [{ wch: 22 }, { wch: 42 }];
 
       const libro = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(libro, hojaResumen, 'Resumen');
       XLSX.utils.book_append_sheet(libro, hojaRegistros, 'Registros');
-      XLSX.writeFile(libro, `Reporte_EcoTrack_${sufijo}.xlsx`);
+      XLSX.writeFile(libro, `Reporte_EcoTrack_${periodo.sufijo}.xlsx`);
       mostrarAlerta('Excel generado correctamente.', 'success');
     } catch (error) {
       mostrarAlerta("Error al generar el Excel: " + error.message, 'error');
@@ -932,6 +1007,8 @@ function App() {
   // ==========================================
   // VISTA 3: DASHBOARD PRINCIPAL
   // ==========================================
+  const estiloSelectorReporte = { padding: '13px', borderRadius: '10px', border: `3px solid ${colors.primary}`, backgroundColor: '#fff', color: colors.organicosText, fontWeight: 'bold', outline: 'none', fontSize: '14px', cursor: 'pointer' };
+
   return (
     <div style={{ width: '100vw', minHeight: '100vh', backgroundColor: '#f3f4f6', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif', color: '#1f2937', overflowX: 'hidden' }}>
 
@@ -977,11 +1054,22 @@ function App() {
             <select
               value={tipoReporte}
               onChange={(e) => setTipoReporte(e.target.value)}
-              style={{ padding: '13px', borderRadius: '10px', border: `3px solid ${colors.primary}`, backgroundColor: '#fff', color: colors.organicosText, fontWeight: 'bold', outline: 'none', fontSize: '14px', cursor: 'pointer' }}
+              style={estiloSelectorReporte}
             >
               <option value="actual">Reporte: Mes Actual</option>
+              <option value="anterior">Reporte: Mes Anterior</option>
+              <option value="personalizado">Reporte: Elegir mes...</option>
               <option value="todos">Reporte: Historial Completo</option>
             </select>
+            {tipoReporte === 'personalizado' && (
+              <input
+                type="month"
+                value={mesPersonalizado}
+                max={mesActualTexto()}
+                onChange={(e) => setMesPersonalizado(e.target.value)}
+                style={estiloSelectorReporte}
+              />
+            )}
             <button onClick={generarReportePDF} style={{ padding: '14px 24px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(0,0,0,0.15)', fontSize: '14px' }}>
               🖨️ Descargar Reporte PDF
             </button>
@@ -1050,7 +1138,7 @@ function App() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '30px', marginBottom: '35px' }}>
           <GraficaLuz datos={registros} />
           <GraficaAgua datos={registros} />
-          <GraficaResiduos registros={registros} tipoReporte={tipoReporte} />
+          <GraficaResiduos registros={registros} periodo={periodo} />
         </div>
 
         <div style={{ ...cardStyle, backgroundColor: '#fff', border: `3px solid ${colors.agua}`, padding: '20px' }}>
